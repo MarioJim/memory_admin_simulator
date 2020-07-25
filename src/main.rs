@@ -1,14 +1,14 @@
 use std::convert::TryFrom;
 use std::env;
-
 use std::fs;
 
 mod instructions;
+mod process;
 mod system;
 
 use instructions::Instruction;
 use system::fifo::FIFOSystem;
-use system::MemoryAdministrationAlgorithm;
+use system::MemoryAdministrationSystem;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,7 +21,7 @@ fn main() {
         .map(|line| Instruction::try_from(line))
         .for_each(|maybe_ins| match maybe_ins {
             Ok(ins) => {
-                println!("{:?}", ins);
+                println!("{}", ins);
                 system.process_instruction(&ins);
             }
             Err(e) => println!("Error: {}", e),

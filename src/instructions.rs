@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Instruction {
@@ -92,5 +93,28 @@ fn parse_string_to_bool(
             _ => Err(format!("Valor {} no válido para un booleano", num)),
         },
         Err(e) => Err(e),
+    }
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            Instruction::Process { pid, size } => write!(f, "P {} {}", *size, *pid),
+            Instruction::Access {
+                pid,
+                address,
+                modifies,
+            } => write!(
+                f,
+                "A {} {} {}",
+                *address,
+                *pid,
+                if *modifies { 1 } else { 0 },
+            ),
+            Instruction::Free { pid } => write!(f, "L {}", *pid),
+            Instruction::Comment(string) => write!(f, "C {}", *string),
+            Instruction::End() => write!(f, "F"),
+            Instruction::Exit() => write!(f, "E"),
+        }
     }
 }

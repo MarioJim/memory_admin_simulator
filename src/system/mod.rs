@@ -1,45 +1,66 @@
-use std::ops::Range;
-
 pub mod fifo;
 pub mod lru;
 
+use crate::process::{Process, ProcessFrame};
 use crate::Instruction;
 
 #[derive(Debug)]
 pub struct System {
+    pub processes: Vec<Process>,
     pub page_size: u16,
     pub m: Vec<Option<ProcessFrame>>,
     pub s: Vec<Option<ProcessFrame>>,
-    pub processes: Vec<Process>,
+}
+
+enum Memory {
+    Real,
+    Swap,
 }
 
 impl System {
-    pub fn new(page_size: u16, m_size: usize, s_size: usize) -> Self {
+    fn new(page_size: u16, m_size: usize, s_size: usize) -> Self {
         let m_frames = ((m_size as f64) / (page_size as f64)).ceil() as usize;
         let s_frames = ((s_size as f64) / (page_size as f64)).ceil() as usize;
         System {
+            processes: Vec::new(),
             page_size,
             m: vec![None; m_frames],
             s: vec![None; s_frames],
-            processes: Vec::new(),
         }
+    }
+
+    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<(Memory, usize)> {
+        for m_index in 0..self.m.len() {
+            if let Some(ProcessFrame {
+                pid,
+                index,
+                size: _,
+            }) = self.m[m_index]
+            {
+                if pid == pid_to_find && index == page_index {
+                    return Some((Memory::Real, m_index));
+                }
+            }
+        }
+
+        for s_index in 0..self.s.len() {
+            if let Some(ProcessFrame {
+                pid,
+                index,
+                size: _,
+            }) = self.m[s_index]
+            {
+                if pid == pid_to_find && index == page_index {
+                    return Some((Memory::Swap, s_index));
+                }
+            }
+        }
+
+        None
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ProcessFrame {
-    pub pid: u16,
-    pub size: u8,
-}
-
-#[derive(Debug)]
-pub struct Process {
-    pub pid: u16,
-    pub life: Range<f64>,
-    pub page_faults: u16,
-}
-
-pub trait MemoryAdministrationAlgorithm {
+pub trait MemoryAdministrationSystem {
     fn new(page_size: u16, m_size: usize, s_size: usize) -> Self;
 
     fn process_instruction(&mut self, instruction: &Instruction) {
