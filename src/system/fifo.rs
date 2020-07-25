@@ -2,40 +2,37 @@ use std::collections::VecDeque;
 use std::ops::Range;
 
 use super::MemoryAdministrationAlgorithm;
-use super::Process;
-use crate::memory::Memory;
-use crate::memory::ProcessFrame;
+use super::ProcessFrame;
+use super::System;
 
 #[derive(Debug)]
 pub struct FIFOSystem<'a> {
-    memory: Memory,
+    system: System,
     time: f64,
-    processes: Vec<Process>,
     queue: VecDeque<&'a ProcessFrame>,
 }
 
 impl<'a> MemoryAdministrationAlgorithm for FIFOSystem<'a> {
     fn new(page_size: u16, m_size: usize, s_size: usize) -> FIFOSystem<'a> {
         FIFOSystem {
-            memory: Memory::new(page_size, m_size, s_size),
+            system: System::new(page_size, m_size, s_size),
             time: 0.0,
             queue: VecDeque::new(),
-            processes: Vec::new(),
         }
     }
 
     fn process(&mut self, pid: u16, size: u16) {
-        let frames_needed = (size as f64 / self.memory.page_size as f64).ceil() as usize;
+        let frames_needed = (size as f64 / self.system.page_size as f64).ceil() as usize;
     }
 
     fn access(&mut self, address: u16, pid: u16, modifies: bool) {}
 
     fn free(&mut self, pid_to_free: u16) {
         let mut m_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.memory.m_size {
-            match self.memory.m[index] {
+        for index in 0..self.system.m.len() {
+            match self.system.m[index] {
                 Some(ProcessFrame { pid, size: _ }) if pid == pid_to_free => {
-                    self.memory.m[index] = None;
+                    self.system.m[index] = None;
                     self.time += 0.1;
                     match m_freed_ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,
@@ -58,10 +55,10 @@ impl<'a> MemoryAdministrationAlgorithm for FIFOSystem<'a> {
         );
 
         let mut s_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.memory.s_size {
-            match self.memory.s[index] {
+        for index in 0..self.system.s.len() {
+            match self.system.s[index] {
                 Some(ProcessFrame { pid, size: _ }) if pid == pid_to_free => {
-                    self.memory.s[index] = None;
+                    self.system.s[index] = None;
                     self.time += 0.1;
                     match s_freed_ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,

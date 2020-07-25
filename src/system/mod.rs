@@ -6,10 +6,37 @@ pub mod lru;
 use crate::Instruction;
 
 #[derive(Debug)]
+pub struct System {
+    pub page_size: u16,
+    pub m: Vec<Option<ProcessFrame>>,
+    pub s: Vec<Option<ProcessFrame>>,
+    pub processes: Vec<Process>,
+}
+
+impl System {
+    pub fn new(page_size: u16, m_size: usize, s_size: usize) -> Self {
+        let m_frames = ((m_size as f64) / (page_size as f64)).ceil() as usize;
+        let s_frames = ((s_size as f64) / (page_size as f64)).ceil() as usize;
+        System {
+            page_size,
+            m: vec![None; m_frames],
+            s: vec![None; s_frames],
+            processes: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessFrame {
+    pub pid: u16,
+    pub size: u8,
+}
+
+#[derive(Debug)]
 pub struct Process {
-    pid: u16,
-    life: Range<f64>,
-    page_faults: u16,
+    pub pid: u16,
+    pub life: Range<f64>,
+    pub page_faults: u16,
 }
 
 pub trait MemoryAdministrationAlgorithm {

@@ -4,12 +4,11 @@ use std::env;
 use std::fs;
 
 mod instructions;
-mod memory;
-mod systems;
+mod system;
 
 use instructions::Instruction;
-use systems::fifo::FIFOSystem;
-use systems::MemoryAdministrationAlgorithm;
+use system::fifo::FIFOSystem;
+use system::MemoryAdministrationAlgorithm;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
