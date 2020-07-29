@@ -2,12 +2,12 @@
 
 Final project for Operating Systems written in Rust
 
-A toy simulator used to compare between two memory administration politics:
+A toy simulator used to compare between two page replacement algorithms:
 
 - First In First Out
 - Least Recently Used
 
-The simulator has 2048 bytes of memory and 4096 bytes of swap space divided into frames of 16 bytes.
+The simulator has 2048 bytes of memory and 4096 bytes of swap space divided into frames of 16 bytes by default, but these values can be changed.
 
 ## Usage
 

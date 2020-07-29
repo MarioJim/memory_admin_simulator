@@ -45,10 +45,7 @@ impl TryFrom<&str> for Instruction {
                 let pid = parse_string_to_u16(line_iter.next(), "L")?;
                 Ok(Instruction::Free { pid })
             }
-            Some("C") => Ok(Instruction::Comment(format!(
-                "Comentario: \"{}\"",
-                &value[1..]
-            ))),
+            Some("C") => Ok(Instruction::Comment(String::from(&value[2..]))),
             Some("F") => Ok(Instruction::End()),
             Some("E") => Ok(Instruction::Exit()),
             Some(other) => Err(format!("Instrucción no reconocida: \"{}\"", other)),
