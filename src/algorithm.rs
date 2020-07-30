@@ -27,7 +27,7 @@ impl PageReplacementAlgorithm {
         {
             "fifo" => PageReplacementAlgorithm::FIFO,
             "lru" => PageReplacementAlgorithm::LRU,
-            _ => panic!("No algorithm exists with that name"),
+            _ => panic!("Un algoritmo con ese nombre no se ha implementado"),
         }
     }
 }

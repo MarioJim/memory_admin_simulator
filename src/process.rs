@@ -12,4 +12,5 @@ pub struct ProcessFrame {
     pub pid: u16,
     pub index: usize,
     pub size: u8,
+    pub last_accessed: f64,
 }

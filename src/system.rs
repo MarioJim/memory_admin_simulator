@@ -4,14 +4,16 @@ use crate::algorithm::PageReplacementAlgorithm;
 use crate::process::{Process, ProcessFrame};
 use crate::Instruction;
 
+const FREE_PAGE_TIME: f64 = 0.1;
+
 #[derive(Debug)]
 pub struct System {
     algorithm: PageReplacementAlgorithm,
-    pub time: f64,
-    pub processes: Vec<Process>,
-    pub page_size: usize,
-    pub real_mem: Vec<Option<ProcessFrame>>,
-    pub virt_mem: Vec<Option<ProcessFrame>>,
+    time: f64,
+    processes: Vec<Process>,
+    page_size: usize,
+    real_mem: Vec<Option<ProcessFrame>>,
+    virt_mem: Vec<Option<ProcessFrame>>,
 }
 
 impl System {
@@ -34,50 +36,59 @@ impl System {
     }
 
     pub fn process_instruction(&mut self, instruction: &Instruction) {
-        match instruction {
-            Instruction::Process { pid, size } => self.process(*pid, *size),
+        let time = match instruction {
+            Instruction::Process { pid, size } => {
+                if *size as usize <= self.real_mem.len() * self.page_size {
+                    self.process(*pid, *size)
+                } else {
+                    println!(
+                        "La instrucción no se ha ejecutado ya que el proceso no cabe en memoria"
+                    );
+                    println!("Disminuya el tamaño del proceso o aumente el tamaño de la memoria con la opción -m");
+                    0.0
+                }
+            }
             Instruction::Access {
                 pid,
                 address,
                 modifies,
-            } => self.access(*pid, *address, *modifies),
-            Instruction::Free { pid } => self.free(*pid),
-            Instruction::End() => self.end(),
-            Instruction::Comment(_) | Instruction::Exit() => (),
+            } => {
+                if self.is_valid_pid(*pid) {
+                    self.access(*pid, *address, *modifies)
+                } else {
+                    0.0
+                }
+            }
+            Instruction::Free { pid } => {
+                if self.is_valid_pid(*pid) {
+                    self.free(*pid)
+                } else {
+                    0.0
+                }
+            }
+            Instruction::End() => {
+                self.end();
+                0.0
+            }
+            Instruction::Comment(_) | Instruction::Exit() => 0.0,
+        };
+        println!("La instrucción tomó {} segundos", time);
+        self.time += time;
+    }
+
+    fn is_valid_pid(&self, checked_pid: u16) -> bool {
+        match self.processes.iter().find(|p| p.pid == checked_pid) {
+            Some(_) => true,
+            None => {
+                println!(
+                    "La instrucción no se ha ejecutado ya que no existe un proceso con ese pid"
+                );
+                false
+            }
         }
     }
 
-    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<(Memory, usize)> {
-        for index in 0..self.real_mem.len() {
-            match self.real_mem[index] {
-                Some(ProcessFrame {
-                    pid,
-                    index,
-                    size: _,
-                }) if pid == pid_to_find && index == page_index => {
-                    return Some((Memory::Real, index));
-                }
-                _ => (),
-            }
-        }
-
-        for index in 0..self.virt_mem.len() {
-            match self.virt_mem[index] {
-                Some(ProcessFrame {
-                    pid,
-                    index,
-                    size: _,
-                }) if pid == pid_to_find && index == page_index => {
-                    return Some((Memory::Virtual, index));
-                }
-                _ => (),
-            }
-        }
-
-        None
-    }
-
-    fn process(&mut self, pid: u16, total_size: u16) {
+    fn process(&mut self, pid: u16, total_size: u16) -> f64 {
         let pages_needed = (total_size as f64 / self.page_size as f64).ceil() as usize;
         println!(
             "Se asignaron {} bytes ({} páginas) al proceso {}",
@@ -86,14 +97,16 @@ impl System {
         let process = Process {
             pid,
             page_faults: 0,
-            life: Range {
-                start: self.time,
-                end: self.time,
-            },
+            life: (self.time..-1.0),
         };
         let mut size_left = total_size as usize;
         loop {
             // TODO: Allocate frame for process
+            // TODO: If needed, handle page fault
+            let page_to_be_replaced = match self.algorithm {
+                PageReplacementAlgorithm::FIFO => self.fifo_replace_page(),
+                PageReplacementAlgorithm::LRU => self.lru_replace_page(),
+            };
             if size_left > self.page_size {
                 size_left -= self.page_size;
             } else {
@@ -101,13 +114,15 @@ impl System {
             }
         }
         self.processes.push(process);
+        0.0
     }
 
-    fn access(&mut self, pid_to_access: u16, virtual_address: u16, modifies: bool) {
+    fn access(&mut self, pid_to_access: u16, virtual_address: u16, modifies: bool) -> f64 {
+        let mut time = 0.0;
         let page_index = (virtual_address as f64 / self.page_size as f64).floor() as usize;
         match self.find_page(pid_to_access, page_index) {
-            Some((Memory::Real, index)) => {
-                self.time += 0.1;
+            Some(Frame(Memory::Real, index)) => {
+                time += 0.1;
                 println!(
                     "Se {} la página {} del proceso",
                     if modifies { "modificó" } else { "accedió a" },
@@ -115,7 +130,7 @@ impl System {
                 );
                 println!("Esta corresponde a la página {} de la memoria real", index);
             }
-            Some((Memory::Virtual, index)) => {
+            Some(Frame(Memory::Virtual, index)) => {
                 // TODO: Implementar page fault
             }
             None => {
@@ -126,83 +141,117 @@ impl System {
                 println!("No se encontró la página {}", page_index);
             }
         }
+        time
     }
 
-    fn free(&mut self, pid_to_free: u16) {
-        let mut r_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.real_mem.len() {
-            match self.real_mem[index] {
+    fn free(&mut self, pid_to_free: u16) -> f64 {
+        let frame_is_freed = |index: usize,
+                              maybe_frame: &mut Option<ProcessFrame>,
+                              ranges: &mut Vec<Range<usize>>| {
+            match maybe_frame {
                 Some(ProcessFrame {
                     pid,
-                    index,
+                    index: _,
                     size: _,
-                }) if pid == pid_to_free => {
-                    self.real_mem[index] = None;
-                    self.time += 0.1;
-                    match r_freed_ranges.last_mut() {
+                    last_accessed: _,
+                }) if *pid == pid_to_free => {
+                    *maybe_frame = None;
+                    match ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,
-                        _ => r_freed_ranges.push(Range {
+                        Some(_) | None => ranges.push(Range {
                             start: index,
                             end: index,
                         }),
-                    }
+                    };
+                    true
                 }
-                Some(_) | None => (),
+                Some(_) | None => false,
             }
-        }
+        };
+
+        let mut time = 0.0;
+        let mut r_freed_ranges = Vec::<Range<usize>>::new();
+        self.real_mem
+            .iter_mut()
+            .enumerate()
+            .for_each(|(index, maybe_frame)| {
+                if frame_is_freed(index, maybe_frame, &mut r_freed_ranges) {
+                    time += FREE_PAGE_TIME;
+                }
+            });
         println!(
             "Se liberan de la memoria real: {}",
             r_freed_ranges
                 .iter()
-                .map(|range| format!("{}-{}", range.start, range.end))
+                .map(|range| format!("{} a {}", range.start, range.end))
                 .collect::<Vec<String>>()
                 .join(", ")
         );
 
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.virt_mem.len() {
-            match self.virt_mem[index] {
-                Some(ProcessFrame {
-                    pid,
-                    index,
-                    size: _,
-                }) if pid == pid_to_free => {
-                    self.virt_mem[index] = None;
-                    self.time += 0.1;
-                    match v_freed_ranges.last_mut() {
-                        Some(Range { start: _, end }) if *end == index - 1 => *end = index,
-                        _ => v_freed_ranges.push(Range {
-                            start: index,
-                            end: index,
-                        }),
-                    }
+        self.virt_mem
+            .iter_mut()
+            .enumerate()
+            .for_each(|(index, maybe_frame)| {
+                if frame_is_freed(index, maybe_frame, &mut v_freed_ranges) {
+                    time += FREE_PAGE_TIME;
                 }
-                Some(_) | None => (),
-            }
-        }
+            });
         println!(
             "Se liberan de la memoria virtual: {}",
             v_freed_ranges
                 .iter()
-                .map(|range| format!("{}-{}", range.start, range.end))
+                .map(|range| format!("{} a {}", range.start, range.end))
                 .collect::<Vec<String>>()
                 .join(", ")
         );
 
-        for process in self.processes.iter_mut() {
-            if process.pid == pid_to_free {
-                process.life.end = self.time;
-                break;
-            }
-        }
+        self.processes
+            .iter_mut()
+            .find(|p| p.pid == pid_to_free)
+            .unwrap()
+            .life
+            .end = self.time + time;
+
+        time
     }
 
     fn end(&mut self) {
         println!("Reporte de salida:");
+        let mut finished_processes = Vec::<&Process>::new();
+        for process in &self.processes {
+            if process.life.end != -1.0 {
+                finished_processes.push(process);
+            }
+        }
         // TODO: Calcular turnaround de cada proceso (desde que empezó P hasta que se terminó L)
         // TODO: Calcular turnaround promedio
         // TODO: Calcular núm de page faults por proceso (sólo ocasionados por A)
         // TODO: Calcular núm de swaps (out e in)
+    }
+
+    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<Frame> {
+        if let Some(m_index) = self.real_mem.iter().position(|frame| match frame {
+            Some(page) => page.pid == pid_to_find && page.index == page_index,
+            None => false,
+        }) {
+            Some(Frame(Memory::Real, m_index))
+        } else if let Some(s_index) = self.virt_mem.iter().position(|frame| match frame {
+            Some(page) => page.pid == pid_to_find && page.index == page_index,
+            None => false,
+        }) {
+            Some(Frame(Memory::Virtual, s_index))
+        } else {
+            None
+        }
+    }
+
+    fn fifo_replace_page(&self) -> Frame {
+        unimplemented!()
+    }
+
+    fn lru_replace_page(&self) -> Frame {
+        unimplemented!()
     }
 }
 
@@ -210,3 +259,5 @@ enum Memory {
     Real,
     Virtual,
 }
+
+struct Frame(Memory, usize);
