@@ -1,4 +1,4 @@
-use std::cmp;
+use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::algorithm::PageReplacementAlgorithm;
@@ -16,7 +16,7 @@ const SWAP_PAGE_TIME: Time = Time::from_miliseconds(1000);
 pub struct System {
     algorithm: PageReplacementAlgorithm,
     time: Time,
-    processes: Vec<Process>,
+    processes: HashMap<u16, Process>,
     page_size: usize,
     real_mem: Vec<Option<ProcessPage>>,
     virt_mem: Vec<Option<ProcessPage>>,
@@ -34,7 +34,7 @@ impl System {
         System {
             algorithm,
             time: Time::new(),
-            processes: Vec::new(),
+            processes: HashMap::new(),
             page_size,
             real_mem: vec![None; num_real_frames],
             virt_mem: vec![None; num_virtual_frames],
@@ -59,14 +59,14 @@ impl System {
                 address,
                 modifies,
             } => {
-                if self.is_valid_pid(*pid) {
+                if self.is_valid_pid(*pid, Some(*address)) {
                     self.access(*pid, *address, *modifies)
                 } else {
                     Time::new()
                 }
             }
             Instruction::Free { pid } => {
-                if self.is_valid_pid(*pid) {
+                if self.is_valid_pid(*pid, None) {
                     self.free(*pid)
                 } else {
                     Time::new()
@@ -82,9 +82,12 @@ impl System {
         self.time += time_offset;
     }
 
-    fn is_valid_pid(&self, checked_pid: u16) -> bool {
-        match self.processes.iter().find(|p| p.pid == checked_pid) {
-            Some(_) => true,
+    fn is_valid_pid(&self, checked_pid: u16, maybe_address: Option<usize>) -> bool {
+        match self.processes.get(&checked_pid) {
+            Some(process) => match maybe_address {
+                Some(address) => process.size > address,
+                None => true,
+            },
             None => {
                 println!(
                     "La instrucción no se ha ejecutado ya que no existe un proceso con ese pid"
@@ -94,66 +97,49 @@ impl System {
         }
     }
 
-    fn process(&mut self, pid: u16, total_size: u16) -> Time {
-        let pages_needed = (total_size as f64 / self.page_size as f64).ceil() as usize;
+    fn process(&mut self, pid: u16, total_size: usize) -> Time {
+        let mut new_process = Process {
+            pid,
+            page_faults: 0,
+            size: total_size,
+            life: (Time::new()..Time::max()),
+        };
+        let pages_needed = new_process.num_pages(self.page_size);
         println!(
             "Se asignaron {} bytes ({} páginas) al proceso {}",
             total_size, pages_needed, pid,
         );
         let mut time_offset = Time::new();
-        let mut size_left = total_size as usize;
         for page_index in 0..pages_needed {
             let empty_frame_index = match self.find_empty_frame(Memory::Real) {
                 Ok(index) => index,
-                Err(_) => {
-                    let frame_index_to_be_replaced = match self.algorithm {
-                        PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
-                        PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
-                    };
-                    let empty_frame_index_in_virtual =
-                        self.find_empty_frame(Memory::Virtual).unwrap();
-                    self.virt_mem[empty_frame_index_in_virtual] =
-                        self.real_mem[frame_index_to_be_replaced];
-                    frame_index_to_be_replaced
-                }
+                Err(_) => self.swap_out_page(&mut time_offset),
             };
             self.real_mem[empty_frame_index] = Some(ProcessPage {
                 pid,
                 index: page_index,
-                size: cmp::min(size_left, self.page_size),
                 created: self.time + time_offset,
                 accessed: self.time + time_offset,
             });
-            size_left -= self.page_size;
             time_offset += LOAD_PAGE_TIME;
         }
-        self.processes.push(Process {
-            pid,
-            page_faults: 0,
-            life: (self.time + time_offset..Time::max()),
-        });
+        new_process.life.start = self.time + time_offset;
+        self.processes.insert(pid, new_process);
         time_offset
     }
 
-    fn access(&mut self, pid_to_access: u16, virtual_address: u16, modifies: bool) -> Time {
-        let mut time = Time::new();
+    fn access(&mut self, pid_to_access: u16, virtual_address: usize, modifies: bool) -> Time {
         let page_index = (virtual_address as f64 / self.page_size as f64).floor() as usize;
         match self.find_page(pid_to_access, page_index) {
             Some(Frame(Memory::Real, index)) => {
-                time += if modifies {
-                    MODIFY_PAGE_TIME
-                } else {
-                    ACCESS_PAGE_TIME
-                };
-                println!(
-                    "Se {} la página {} del proceso",
-                    if modifies { "modificó" } else { "accedió a" },
-                    page_index,
-                );
-                println!("Esta corresponde a la página {} de la memoria real", index);
+                self.access_page_at_index(index, page_index, modifies)
             }
             Some(Frame(Memory::Virtual, index)) => {
-                // TODO: Implementar page fault
+                let mut time_offset = Time::new();
+                let empty_frame_index = self.swap_out_page(&mut time_offset);
+                self.real_mem[empty_frame_index] = self.virt_mem[index];
+                time_offset += self.access_page_at_index(empty_frame_index, page_index, modifies);
+                time_offset
             }
             None => {
                 println!(
@@ -161,9 +147,31 @@ impl System {
                     virtual_address, pid_to_access
                 );
                 println!("No se encontró la página {}", page_index);
+                Time::new()
             }
         }
-        time
+    }
+
+    fn access_page_at_index(
+        &self,
+        real_mem_index: usize,
+        page_index: usize,
+        modifies: bool,
+    ) -> Time {
+        println!(
+            "Se {} la página {} del proceso",
+            if modifies { "modificó" } else { "accedió a" },
+            page_index,
+        );
+        println!(
+            "Esta corresponde a la página {} de la memoria real",
+            real_mem_index
+        );
+        if modifies {
+            MODIFY_PAGE_TIME
+        } else {
+            ACCESS_PAGE_TIME
+        }
     }
 
     fn free(&mut self, pid_to_free: u16) -> Time {
@@ -174,7 +182,6 @@ impl System {
                 Some(ProcessPage {
                     pid,
                     index: _,
-                    size: _,
                     created: _,
                     accessed: _,
                 }) if *pid == pid_to_free => {
@@ -229,12 +236,7 @@ impl System {
                 .join(", ")
         );
 
-        self.processes
-            .iter_mut()
-            .find(|p| p.pid == pid_to_free)
-            .unwrap()
-            .life
-            .end = self.time + time;
+        self.processes.get_mut(&pid_to_free).unwrap().life.end = self.time + time;
 
         time
     }
@@ -244,7 +246,13 @@ impl System {
         let finished_processes: Vec<&Process> = self
             .processes
             .iter()
-            .filter(|process| process.life.end != Time::max())
+            .filter_map(|(_, process)| {
+                if process.life.end != Time::max() {
+                    Some(process)
+                } else {
+                    None
+                }
+            })
             .collect();
         // TODO: Calcular turnaround de cada proceso (desde que empezó P hasta que se terminó L)
         // TODO: Calcular turnaround promedio
@@ -266,6 +274,17 @@ impl System {
         } else {
             None
         }
+    }
+
+    fn swap_out_page(&mut self, time_offset: &mut Time) -> usize {
+        *time_offset += SWAP_PAGE_TIME;
+        let frame_index_to_be_replaced = match self.algorithm {
+            PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
+            PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
+        };
+        let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
+        self.virt_mem[empty_frame_index_in_virtual] = self.real_mem[frame_index_to_be_replaced];
+        frame_index_to_be_replaced
     }
 
     fn fifo_find_page_to_replace(&self) -> usize {
