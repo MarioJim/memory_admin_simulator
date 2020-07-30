@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use crate::time::Time;
+use crate::util::ceil_division;
 
 #[derive(Debug)]
 pub struct Process {
@@ -12,7 +13,7 @@ pub struct Process {
 
 impl Process {
     pub fn num_pages(&self, page_size: usize) -> usize {
-        (self.size as f64 / page_size as f64).ceil() as usize
+        ceil_division(self.size, page_size)
     }
 }
 

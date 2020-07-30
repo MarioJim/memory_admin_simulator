@@ -3,13 +3,14 @@ use std::fs;
 
 mod algorithm;
 mod cli;
-mod instructions;
+mod instruction;
 mod process;
 mod system;
 mod time;
+mod util;
 
 use algorithm::PageReplacementAlgorithm;
-use instructions::Instruction;
+use instruction::Instruction;
 use system::System;
 
 fn main() {
