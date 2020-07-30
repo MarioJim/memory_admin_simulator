@@ -2,21 +2,21 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::algorithm::PageReplacementAlgorithm;
-use crate::process::{Process, ProcessPage};
+use crate::process::{Process, ProcessPage, PID};
 use crate::time::Time;
 use crate::Instruction;
 
-const ACCESS_PAGE_TIME: Time = Time::from_miliseconds(0100);
-const FREE_PAGE_TIME: Time = Time::from_miliseconds(0100);
+const ACCESS_PAGE_TIME: Time = Time::from_miliseconds(100);
+const FREE_PAGE_TIME: Time = Time::from_miliseconds(100);
 const LOAD_PAGE_TIME: Time = Time::from_miliseconds(1000);
-const MODIFY_PAGE_TIME: Time = Time::from_miliseconds(0100);
+const MODIFY_PAGE_TIME: Time = Time::from_miliseconds(100);
 const SWAP_PAGE_TIME: Time = Time::from_miliseconds(1000);
 
 #[derive(Debug)]
 pub struct System {
     algorithm: PageReplacementAlgorithm,
     time: Time,
-    processes: HashMap<u16, Process>,
+    processes: HashMap<PID, Process>,
     page_size: usize,
     real_mem: Vec<Option<ProcessPage>>,
     virt_mem: Vec<Option<ProcessPage>>,
@@ -82,28 +82,8 @@ impl System {
         self.time += time_offset;
     }
 
-    fn is_valid_pid(&self, checked_pid: u16, maybe_address: Option<usize>) -> bool {
-        match self.processes.get(&checked_pid) {
-            Some(process) => match maybe_address {
-                Some(address) => process.size > address,
-                None => true,
-            },
-            None => {
-                println!(
-                    "La instrucción no se ha ejecutado ya que no existe un proceso con ese pid"
-                );
-                false
-            }
-        }
-    }
-
-    fn process(&mut self, pid: u16, total_size: usize) -> Time {
-        let mut new_process = Process {
-            pid,
-            page_faults: 0,
-            size: total_size,
-            life: (Time::new()..Time::max()),
-        };
+    fn process(&mut self, pid: PID, total_size: usize) -> Time {
+        let mut new_process = Process::new(pid, total_size);
         let pages_needed = new_process.num_pages(self.page_size);
         println!(
             "Se asignaron {} bytes ({} páginas) al proceso {}",
@@ -123,33 +103,28 @@ impl System {
             });
             time_offset += LOAD_PAGE_TIME;
         }
-        new_process.life.start = self.time + time_offset;
+        new_process.set_birth(self.time + time_offset);
         self.processes.insert(pid, new_process);
         time_offset
     }
 
-    fn access(&mut self, pid_to_access: u16, virtual_address: usize, modifies: bool) -> Time {
-        let page_index = (virtual_address as f64 / self.page_size as f64).floor() as usize;
-        match self.find_page(pid_to_access, page_index) {
-            Some(Frame(Memory::Real, index)) => {
-                self.access_page_at_index(index, page_index, modifies)
-            }
-            Some(Frame(Memory::Virtual, index)) => {
-                let mut time_offset = Time::new();
+    fn access(&mut self, pid_to_access: PID, virtual_address: usize, modifies: bool) -> Time {
+        let mut time_offset = Time::new();
+        let process_page_index = virtual_address / self.page_size;
+        let real_mem_index = match self.find_page(pid_to_access, process_page_index) {
+            Frame(Memory::Real, index) => index,
+            Frame(Memory::Virtual, index) => {
+                self.processes
+                    .get_mut(&pid_to_access)
+                    .unwrap()
+                    .add_page_fault();
                 let empty_frame_index = self.swap_out_page(&mut time_offset);
                 self.real_mem[empty_frame_index] = self.virt_mem[index];
-                time_offset += self.access_page_at_index(empty_frame_index, page_index, modifies);
-                time_offset
+                empty_frame_index
             }
-            None => {
-                println!(
-                    "Error en instrucción A {{ dirección: {}, proceso: {} }}",
-                    virtual_address, pid_to_access
-                );
-                println!("No se encontró la página {}", page_index);
-                Time::new()
-            }
-        }
+        };
+        time_offset += self.access_page_at_index(real_mem_index, process_page_index, modifies);
+        time_offset
     }
 
     fn access_page_at_index(
@@ -174,7 +149,7 @@ impl System {
         }
     }
 
-    fn free(&mut self, pid_to_free: u16) -> Time {
+    fn free(&mut self, pid_to_free: PID) -> Time {
         let frame_is_freed = |index: usize,
                               maybe_frame: &mut Option<ProcessPage>,
                               ranges: &mut Vec<Range<usize>>| {
@@ -236,7 +211,10 @@ impl System {
                 .join(", ")
         );
 
-        self.processes.get_mut(&pid_to_free).unwrap().life.end = self.time + time;
+        self.processes
+            .get_mut(&pid_to_free)
+            .unwrap()
+            .set_death(self.time + time);
 
         time
     }
@@ -247,7 +225,7 @@ impl System {
             .processes
             .iter()
             .filter_map(|(_, process)| {
-                if process.life.end != Time::max() {
+                if process.has_died() {
                     Some(process)
                 } else {
                     None
@@ -260,19 +238,33 @@ impl System {
         // TODO: Calcular núm de swaps (out e in)
     }
 
-    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<Frame> {
+    fn is_valid_pid(&self, checked_pid: PID, maybe_address: Option<usize>) -> bool {
+        match (self.processes.get(&checked_pid), maybe_address) {
+            (Some(process), Some(address)) => process.size > address,
+            (Some(_), None) => true,
+            (None, _) => {
+                println!("Instrucción ignorada: no existe un proceso con ese pid");
+                false
+            }
+        }
+    }
+
+    fn find_page(&self, pid_to_find: PID, page_index: usize) -> Frame {
         if let Some(m_index) = self.real_mem.iter().position(|frame| match frame {
             Some(page) => page.pid == pid_to_find && page.index == page_index,
             None => false,
         }) {
-            Some(Frame(Memory::Real, m_index))
+            Frame(Memory::Real, m_index)
         } else if let Some(s_index) = self.virt_mem.iter().position(|frame| match frame {
             Some(page) => page.pid == pid_to_find && page.index == page_index,
             None => false,
         }) {
-            Some(Frame(Memory::Virtual, s_index))
+            Frame(Memory::Virtual, s_index)
         } else {
-            None
+            panic!(
+                "No se encontró la página {} del proceso {}",
+                page_index, pid_to_find
+            )
         }
     }
 

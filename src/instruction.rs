@@ -1,21 +1,22 @@
 use std::convert::TryFrom;
 use std::fmt;
 
+use crate::process::PID;
 use crate::util;
 
 #[derive(Debug)]
 pub enum Instruction {
     Process {
-        pid: u16,
+        pid: PID,
         size: usize,
     },
     Access {
         address: usize,
         modifies: bool,
-        pid: u16,
+        pid: PID,
     },
     Free {
-        pid: u16,
+        pid: PID,
     },
     Comment(String),
     End(),
@@ -29,14 +30,14 @@ impl TryFrom<&str> for Instruction {
         let mut line_iter = value.split_ascii_whitespace();
         match line_iter.next() {
             Some("P") => {
-                let pid = util::string_to_u16(line_iter.next(), "P")?;
+                let pid = util::string_to_pid(line_iter.next(), "P")?;
                 let size = util::string_to_usize(line_iter.next(), "P")?;
                 Ok(Instruction::Process { pid, size })
             }
             Some("A") => {
                 let address = util::string_to_usize(line_iter.next(), "A")?;
                 let modifies = util::string_to_bool(line_iter.next(), "A")?;
-                let pid = util::string_to_u16(line_iter.next(), "A")?;
+                let pid = util::string_to_pid(line_iter.next(), "A")?;
                 Ok(Instruction::Access {
                     address,
                     modifies,
@@ -44,7 +45,7 @@ impl TryFrom<&str> for Instruction {
                 })
             }
             Some("L") => {
-                let pid = util::string_to_u16(line_iter.next(), "L")?;
+                let pid = util::string_to_pid(line_iter.next(), "L")?;
                 Ok(Instruction::Free { pid })
             }
             Some("C") => Ok(Instruction::Comment(String::from(&value[2..]))),

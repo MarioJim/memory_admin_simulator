@@ -1,4 +1,6 @@
-pub fn ceil_division(top: usize, bot: usize) -> usize {
+use crate::process::PID;
+
+pub fn ceil_div(top: usize, bot: usize) -> usize {
     match top % bot {
         0 => top / bot,
         _ => 1 + top / bot,
@@ -22,11 +24,11 @@ pub fn parse_string<T: std::str::FromStr>(
     }
 }
 
-pub fn string_to_u16(maybe_string: Option<&str>, instruction_name: &str) -> Result<u16, String> {
+pub fn string_to_pid(maybe_string: Option<&str>, instruction_name: &str) -> Result<PID, String> {
     parse_string(
         maybe_string,
         instruction_name,
-        format!("un entero no negativo menor a {}", u16::MAX),
+        format!("un entero no negativo menor a {}", PID::MAX),
     )
 }
 
