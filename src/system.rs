@@ -10,26 +10,26 @@ pub struct System {
     pub time: f64,
     pub processes: Vec<Process>,
     pub page_size: usize,
-    pub m: Vec<Option<ProcessFrame>>,
-    pub s: Vec<Option<ProcessFrame>>,
+    pub real_mem: Vec<Option<ProcessFrame>>,
+    pub virt_mem: Vec<Option<ProcessFrame>>,
 }
 
 impl System {
     pub fn new(
         algorithm: PageReplacementAlgorithm,
         page_size: usize,
-        mem_size: usize,
-        swap_size: usize,
+        real_mem_size: usize,
+        virtual_mem_size: usize,
     ) -> Self {
-        let m_frames = ((mem_size as f64) / (page_size as f64)).ceil() as usize;
-        let s_frames = ((swap_size as f64) / (page_size as f64)).ceil() as usize;
+        let num_real_frames = ((real_mem_size as f64) / (page_size as f64)).ceil() as usize;
+        let num_virtual_frames = ((virtual_mem_size as f64) / (page_size as f64)).ceil() as usize;
         System {
             algorithm,
             time: 0.0,
             processes: Vec::new(),
             page_size,
-            m: vec![None; m_frames],
-            s: vec![None; s_frames],
+            real_mem: vec![None; num_real_frames],
+            virt_mem: vec![None; num_virtual_frames],
         }
     }
 
@@ -47,28 +47,28 @@ impl System {
         }
     }
 
-    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<(Mem, usize)> {
-        for m_index in 0..self.m.len() {
-            match self.m[m_index] {
+    fn find_page(&self, pid_to_find: u16, page_index: usize) -> Option<(Memory, usize)> {
+        for index in 0..self.real_mem.len() {
+            match self.real_mem[index] {
                 Some(ProcessFrame {
                     pid,
                     index,
                     size: _,
                 }) if pid == pid_to_find && index == page_index => {
-                    return Some((Mem::Real, m_index));
+                    return Some((Memory::Real, index));
                 }
                 _ => (),
             }
         }
 
-        for s_index in 0..self.s.len() {
-            match self.s[s_index] {
+        for index in 0..self.virt_mem.len() {
+            match self.virt_mem[index] {
                 Some(ProcessFrame {
                     pid,
                     index,
                     size: _,
                 }) if pid == pid_to_find && index == page_index => {
-                    return Some((Mem::Swap, s_index));
+                    return Some((Memory::Virtual, index));
                 }
                 _ => (),
             }
@@ -106,7 +106,7 @@ impl System {
     fn access(&mut self, pid_to_access: u16, virtual_address: u16, modifies: bool) {
         let page_index = (virtual_address as f64 / self.page_size as f64).floor() as usize;
         match self.find_page(pid_to_access, page_index) {
-            Some((Mem::Real, index)) => {
+            Some((Memory::Real, index)) => {
                 self.time += 0.1;
                 println!(
                     "Se {} la página {} del proceso",
@@ -115,7 +115,7 @@ impl System {
                 );
                 println!("Esta corresponde a la página {} de la memoria real", index);
             }
-            Some((Mem::Swap, index)) => {
+            Some((Memory::Virtual, index)) => {
                 // TODO: Implementar page fault
             }
             None => {
@@ -129,19 +129,19 @@ impl System {
     }
 
     fn free(&mut self, pid_to_free: u16) {
-        let mut m_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.m.len() {
-            match self.m[index] {
+        let mut r_freed_ranges = Vec::<Range<usize>>::new();
+        for index in 0..self.real_mem.len() {
+            match self.real_mem[index] {
                 Some(ProcessFrame {
                     pid,
                     index,
                     size: _,
                 }) if pid == pid_to_free => {
-                    self.m[index] = None;
+                    self.real_mem[index] = None;
                     self.time += 0.1;
-                    match m_freed_ranges.last_mut() {
+                    match r_freed_ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,
-                        _ => m_freed_ranges.push(Range {
+                        _ => r_freed_ranges.push(Range {
                             start: index,
                             end: index,
                         }),
@@ -151,27 +151,27 @@ impl System {
             }
         }
         println!(
-            "Se liberan los marcos de memoria real: {}",
-            m_freed_ranges
+            "Se liberan de la memoria real: {}",
+            r_freed_ranges
                 .iter()
                 .map(|range| format!("{}-{}", range.start, range.end))
                 .collect::<Vec<String>>()
                 .join(", ")
         );
 
-        let mut s_freed_ranges = Vec::<Range<usize>>::new();
-        for index in 0..self.s.len() {
-            match self.s[index] {
+        let mut v_freed_ranges = Vec::<Range<usize>>::new();
+        for index in 0..self.virt_mem.len() {
+            match self.virt_mem[index] {
                 Some(ProcessFrame {
                     pid,
                     index,
                     size: _,
                 }) if pid == pid_to_free => {
-                    self.s[index] = None;
+                    self.virt_mem[index] = None;
                     self.time += 0.1;
-                    match s_freed_ranges.last_mut() {
+                    match v_freed_ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,
-                        _ => s_freed_ranges.push(Range {
+                        _ => v_freed_ranges.push(Range {
                             start: index,
                             end: index,
                         }),
@@ -181,8 +181,8 @@ impl System {
             }
         }
         println!(
-            "Se liberan del espacio swap: {}",
-            s_freed_ranges
+            "Se liberan de la memoria virtual: {}",
+            v_freed_ranges
                 .iter()
                 .map(|range| format!("{}-{}", range.start, range.end))
                 .collect::<Vec<String>>()
@@ -206,7 +206,7 @@ impl System {
     }
 }
 
-enum Mem {
+enum Memory {
     Real,
-    Swap,
+    Virtual,
 }

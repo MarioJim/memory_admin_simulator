@@ -18,10 +18,10 @@ fn main() {
     let file = fs::read_to_string(filename)
         .expect(format!("No se encontró el archivo {}", filename).as_ref());
     let page_size = cli::get_size(&matches, cli::SizeArgument::Page);
-    let mem_size = cli::get_size(&matches, cli::SizeArgument::Swap);
-    let swap_size = cli::get_size(&matches, cli::SizeArgument::Memory);
+    let real_mem_size = cli::get_size(&matches, cli::SizeArgument::RealMem);
+    let virtual_mem_size = cli::get_size(&matches, cli::SizeArgument::VirtualMem);
 
-    let mut system = System::new(algorithm, page_size, mem_size, swap_size);
+    let mut system = System::new(algorithm, page_size, real_mem_size, virtual_mem_size);
 
     file.lines()
         .map(|line| Instruction::try_from(line))

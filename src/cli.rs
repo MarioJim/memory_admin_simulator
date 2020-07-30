@@ -32,17 +32,17 @@ pub fn get_app() -> clap::App<'static, 'static> {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name(SizeArgument::Memory.as_str())
-                .short("m")
-                .long("memory")
-                .help("Sets the size of the main memory in bytes, defaults to 2048")
+            Arg::with_name(SizeArgument::RealMem.as_str())
+                .short("r")
+                .long("real-mem")
+                .help("Sets the size of the real memory in bytes, defaults to 2048")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name(SizeArgument::Swap.as_str())
-                .short("s")
-                .long("swap")
-                .help("Sets the size of the swap space in bytes, defaults to 4096")
+            Arg::with_name(SizeArgument::VirtualMem.as_str())
+                .short("v")
+                .long("virtual-mem")
+                .help("Sets the size of the virtual memory in bytes, defaults to 4096")
                 .takes_value(true),
         )
 }
@@ -61,24 +61,24 @@ pub fn get_filename<'a>(matches: &'a ArgMatches) -> &'a str {
 
 pub enum SizeArgument {
     Page,
-    Memory,
-    Swap,
+    RealMem,
+    VirtualMem,
 }
 
 impl SizeArgument {
     fn as_str(&self) -> &'static str {
         match self {
             SizeArgument::Page => "page size",
-            SizeArgument::Memory => "memory",
-            SizeArgument::Swap => "swap",
+            SizeArgument::RealMem => "real memory size",
+            SizeArgument::VirtualMem => "virtual memory size",
         }
     }
 
     fn default(&self) -> usize {
         match self {
             SizeArgument::Page => 16,
-            SizeArgument::Memory => 2048,
-            SizeArgument::Swap => 4096,
+            SizeArgument::RealMem => 2048,
+            SizeArgument::VirtualMem => 4096,
         }
     }
 }
