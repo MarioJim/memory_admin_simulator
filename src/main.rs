@@ -6,6 +6,7 @@ mod cli;
 mod instructions;
 mod process;
 mod system;
+mod time;
 
 use algorithm::PageReplacementAlgorithm;
 use instructions::Instruction;
