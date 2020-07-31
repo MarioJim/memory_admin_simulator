@@ -30,14 +30,14 @@ impl TryFrom<&str> for Instruction {
         let mut line_iter = value.split_ascii_whitespace();
         match line_iter.next() {
             Some("P") => {
-                let pid = util::string_to_pid(line_iter.next(), "P")?;
                 let size = util::string_to_usize(line_iter.next(), "P")?;
+                let pid = util::string_to_pid(line_iter.next(), "P")?;
                 Ok(Instruction::Process { pid, size })
             }
             Some("A") => {
                 let address = util::string_to_usize(line_iter.next(), "A")?;
-                let modifies = util::string_to_bool(line_iter.next(), "A")?;
                 let pid = util::string_to_pid(line_iter.next(), "A")?;
+                let modifies = util::string_to_bool(line_iter.next(), "A")?;
                 Ok(Instruction::Access {
                     address,
                     modifies,

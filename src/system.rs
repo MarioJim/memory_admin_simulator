@@ -78,7 +78,7 @@ impl System {
             }
             Instruction::Comment(_) | Instruction::Exit() => Time::new(),
         };
-        println!("La instrucción tomó {} segundos", time_offset);
+        println!("La instrucción tomó {}", time_offset);
         self.time += time_offset;
     }
 
@@ -232,15 +232,37 @@ impl System {
                 }
             })
             .collect();
-        // TODO: Calcular turnaround de cada proceso (desde que empezó P hasta que se terminó L)
-        // TODO: Calcular turnaround promedio
-        // TODO: Calcular núm de page faults por proceso (sólo ocasionados por A)
+
+        println!("Turnaround de cada proceso:");
+        finished_processes.iter().for_each(|process| {
+            println!(
+                "Proceso {}: {}, {} de turnaround",
+                process.pid,
+                process.display_life(),
+                process.calc_turnaround()
+            );
+        });
+        let average_turnaround = finished_processes
+            .iter()
+            .map(|process| process.calc_turnaround())
+            .fold(0.0, |sum, turnaround| sum + f64::from(turnaround))
+            / finished_processes.len() as f64;
+        println!("Turnaround promedio: {} segundos", average_turnaround);
+
+        println!("Page faults por proceso:");
+        finished_processes.iter().for_each(|process| {
+            println!(
+                "Proceso {}: {} page faults",
+                process.pid,
+                process.get_page_faults(),
+            );
+        });
         // TODO: Calcular núm de swaps (out e in)
     }
 
     fn is_valid_pid(&self, checked_pid: PID, maybe_address: Option<usize>) -> bool {
         match (self.processes.get(&checked_pid), maybe_address) {
-            (Some(process), Some(address)) => process.size > address,
+            (Some(process), Some(address)) => process.includes_address(address),
             (Some(_), None) => true,
             (None, _) => {
                 println!("Instrucción ignorada: no existe un proceso con ese pid");

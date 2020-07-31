@@ -8,7 +8,7 @@ pub type PID = u16;
 #[derive(Debug)]
 pub struct Process {
     pub pid: PID,
-    pub size: usize,
+    size: usize,
     life: Range<Time>,
     page_faults: u16,
 }
@@ -27,8 +27,16 @@ impl Process {
         ceil_div(self.size, page_size)
     }
 
+    pub fn includes_address(&self, address: usize) -> bool {
+        address < self.size
+    }
+
     pub fn add_page_fault(&mut self) {
         self.page_faults += 1;
+    }
+
+    pub fn get_page_faults(&self) -> u16 {
+        self.page_faults
     }
 
     pub fn has_died(&self) -> bool {
@@ -41,6 +49,14 @@ impl Process {
 
     pub fn set_death(&mut self, death: Time) {
         self.life.end = death;
+    }
+
+    pub fn display_life(&self) -> String {
+        format!("{} - {}", self.life.start, self.life.end)
+    }
+
+    pub fn calc_turnaround(&self) -> Time {
+        self.life.end - self.life.start
     }
 }
 

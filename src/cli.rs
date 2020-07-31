@@ -84,17 +84,20 @@ impl SizeArgument {
 }
 
 pub fn get_size(matches: &ArgMatches, arg: SizeArgument) -> usize {
-    match matches.args.get(arg.as_str()).unwrap().vals.first() {
-        Some(string) => match string.to_str().unwrap().parse() {
-            Ok(size) => size,
-            Err(_) => {
-                println!(
-                    "Couldn't parse argument {} as a number, using the default ({})",
-                    arg.as_str(),
+    match matches.args.get(arg.as_str()) {
+        Some(matched_args) => match matched_args.vals.first() {
+            Some(string) => match string.to_str().unwrap().parse() {
+                Ok(size) => size,
+                Err(_) => {
+                    println!(
+                        "Couldn't parse argument {} as a number, using the default ({})",
+                        arg.as_str(),
+                        arg.default()
+                    );
                     arg.default()
-                );
-                arg.default()
-            }
+                }
+            },
+            None => arg.default(),
         },
         None => arg.default(),
     }

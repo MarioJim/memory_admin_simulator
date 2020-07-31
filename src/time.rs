@@ -21,13 +21,13 @@ impl Time {
 
 impl fmt::Debug for Time {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} ms", self.0)
+        write!(f, "{}ms", self.0)
     }
 }
 
 impl fmt::Display for Time {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} s", self.0 as f64 / 1000.0)
+        write!(f, "{}s", self.0 as f64 / 1000.0)
     }
 }
 
@@ -42,6 +42,14 @@ impl ops::Add for Time {
 impl ops::AddAssign for Time {
     fn add_assign(&mut self, rhs: Self) {
         self.0 += rhs.0
+    }
+}
+
+impl ops::Sub for Time {
+    type Output = Time;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Time(self.0 - rhs.0)
     }
 }
 
@@ -62,5 +70,11 @@ impl cmp::PartialOrd for Time {
 impl cmp::Ord for Time {
     fn cmp(&self, other: &Self) -> cmp::Ordering {
         self.0.cmp(&other.0)
+    }
+}
+
+impl From<Time> for f64 {
+    fn from(time: Time) -> Self {
+        time.0 as f64
     }
 }
