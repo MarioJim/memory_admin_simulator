@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem::swap;
 use std::ops::Range;
 
 use crate::algorithm::PageReplacementAlgorithm;
@@ -123,11 +124,14 @@ impl System {
                     .unwrap()
                     .add_page_fault();
                 let empty_frame_index = self.swap_out_page(&mut time_offset);
-                self.real_mem[empty_frame_index] = self.virt_mem[index];
+                swap(
+                    &mut self.real_mem[empty_frame_index],
+                    &mut self.virt_mem[index],
+                );
                 println!(
                     "Swap in de la página {} del proceso {}",
-                    self.real_mem[empty_frame_index].unwrap().index,
-                    self.real_mem[empty_frame_index].unwrap().pid
+                    self.real_mem[empty_frame_index].as_ref().unwrap().index,
+                    self.real_mem[empty_frame_index].as_ref().unwrap().pid
                 );
                 empty_frame_index
             }
@@ -147,7 +151,7 @@ impl System {
         } else {
             ACCESS_PAGE_TIME
         };
-        self.real_mem[real_mem_index].unwrap().accessed = self.time + time_offset;
+        self.real_mem[real_mem_index].as_mut().unwrap().accessed = self.time + time_offset;
         time_offset
     }
 

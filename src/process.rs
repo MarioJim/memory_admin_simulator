@@ -60,7 +60,7 @@ impl Process {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ProcessPage {
     pub pid: PID,
     pub index: usize,

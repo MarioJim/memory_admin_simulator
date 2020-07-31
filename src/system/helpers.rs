@@ -1,3 +1,5 @@
+use std::mem::swap;
+
 use super::{Frame, Memory, System, SWAP_PAGE_TIME};
 use crate::algorithm::PageReplacementAlgorithm;
 use crate::process::PID;
@@ -43,10 +45,19 @@ impl System {
         let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
         println!(
             "Swap out de la página {} del proceso {}",
-            self.real_mem[frame_index_to_be_replaced].unwrap().index,
-            self.real_mem[frame_index_to_be_replaced].unwrap().pid
+            self.real_mem[frame_index_to_be_replaced]
+                .as_ref()
+                .unwrap()
+                .index,
+            self.real_mem[frame_index_to_be_replaced]
+                .as_ref()
+                .unwrap()
+                .pid
         );
-        self.virt_mem[empty_frame_index_in_virtual] = self.real_mem[frame_index_to_be_replaced];
+        swap(
+            &mut self.virt_mem[empty_frame_index_in_virtual],
+            &mut self.real_mem[frame_index_to_be_replaced],
+        );
         frame_index_to_be_replaced
     }
 

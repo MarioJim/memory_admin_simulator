@@ -6,7 +6,7 @@ impl System {
             .real_mem
             .iter()
             .enumerate()
-            .min_by_key(|(_, maybe_frame)| maybe_frame.unwrap().created)
+            .min_by_key(|(_, maybe_frame)| maybe_frame.as_ref().unwrap().created)
             .unwrap();
         index
     }
@@ -16,7 +16,7 @@ impl System {
             .real_mem
             .iter()
             .enumerate()
-            .min_by_key(|(_, maybe_frame)| maybe_frame.unwrap().accessed)
+            .min_by_key(|(_, maybe_frame)| maybe_frame.as_ref().unwrap().accessed)
             .unwrap();
         index
     }
