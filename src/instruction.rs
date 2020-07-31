@@ -60,21 +60,43 @@ impl TryFrom<&str> for Instruction {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Instruction::Process { pid, size } => write!(f, "P {} {}", *size, *pid),
+            Instruction::Process { pid, size } => {
+                writeln!(f, "P {} {}", *size, *pid)?;
+                write!(f, "Asignar {} bytes al proceso {}", *size, *pid)
+            }
             Instruction::Access {
                 pid,
                 address,
                 modifies,
-            } => write!(
-                f,
-                "A {} {} {}",
-                *address,
-                *pid,
-                if *modifies { 1 } else { 0 },
-            ),
-            Instruction::Free { pid } => write!(f, "L {}", *pid),
+            } => {
+                writeln!(
+                    f,
+                    "A {} {} {}",
+                    *address,
+                    *pid,
+                    if *modifies { 1 } else { 0 },
+                )?;
+                write!(
+                    f,
+                    "Obtener la dirección real correspondiente a la dirección virtual {} del proceso {}{}",
+                    *address,
+                    *pid,
+                    if *modifies { " y modificar dicha dirección" } else { "" },
+                )
+            }
+            Instruction::Free { pid } => {
+                writeln!(f, "L {}", *pid)?;
+                write!(
+                    f,
+                    "Liberar los marcos de página ocupados por el proceso {}",
+                    *pid
+                )
+            }
             Instruction::Comment(string) => write!(f, "C {}", *string),
-            Instruction::End() => write!(f, "F"),
+            Instruction::End() => {
+                writeln!(f, "F")?;
+                write!(f, "Fin. Reporte de salida:")
+            }
             Instruction::Exit() => write!(f, "E"),
         }
     }

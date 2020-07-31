@@ -222,7 +222,6 @@ impl System {
     }
 
     fn end(&mut self) {
-        println!("Reporte de salida:");
         let finished_processes: Vec<&Process> = self
             .processes
             .iter()
@@ -238,7 +237,7 @@ impl System {
         println!("Turnaround de cada proceso:");
         finished_processes.iter().for_each(|process| {
             println!(
-                "Proceso {}: {}, {} de turnaround",
+                "\tProceso {}: {}, {} de turnaround",
                 process.pid,
                 process.display_life(),
                 process.calc_turnaround()
@@ -255,7 +254,7 @@ impl System {
         println!("Page faults por proceso:");
         finished_processes.iter().for_each(|process| {
             println!(
-                "Proceso {}: {} page faults",
+                "\tProceso {}: {} page faults",
                 process.pid,
                 process.get_page_faults(),
             );
