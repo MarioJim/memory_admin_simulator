@@ -80,6 +80,7 @@ impl System {
         };
         println!("La instrucción tomó {}", time_offset);
         self.time += time_offset;
+        println!();
     }
 
     fn process(&mut self, pid: PID, total_size: usize) -> Time {
@@ -120,33 +121,31 @@ impl System {
                     .add_page_fault();
                 let empty_frame_index = self.swap_out_page(&mut time_offset);
                 self.real_mem[empty_frame_index] = self.virt_mem[index];
+                println!(
+                    "Swap in de la página {} del proceso {}",
+                    self.real_mem[empty_frame_index].unwrap().index,
+                    self.real_mem[empty_frame_index].unwrap().pid
+                );
                 empty_frame_index
             }
         };
-        time_offset += self.access_page_at_index(real_mem_index, process_page_index, modifies);
-        time_offset
-    }
-
-    fn access_page_at_index(
-        &self,
-        real_mem_index: usize,
-        page_index: usize,
-        modifies: bool,
-    ) -> Time {
         println!(
-            "Se {} la página {} del proceso",
+            "Se {} la página {} del proceso {}",
             if modifies { "modificó" } else { "accedió a" },
-            page_index,
+            process_page_index,
+            pid_to_access
         );
         println!(
-            "Esta corresponde a la página {} de la memoria real",
+            "Esta página corresponde al marco {} de la memoria real",
             real_mem_index
         );
-        if modifies {
+        time_offset += if modifies {
             MODIFY_PAGE_TIME
         } else {
             ACCESS_PAGE_TIME
-        }
+        };
+        self.real_mem[real_mem_index].unwrap().accessed = self.time + time_offset;
+        time_offset
     }
 
     fn free(&mut self, pid_to_free: PID) -> Time {
@@ -246,7 +245,8 @@ impl System {
             .iter()
             .map(|process| process.calc_turnaround())
             .fold(0.0, |sum, turnaround| sum + f64::from(turnaround))
-            / finished_processes.len() as f64;
+            / finished_processes.len() as f64
+            / 1000.0;
         println!("Turnaround promedio: {} segundos", average_turnaround);
 
         println!("Page faults por proceso:");
@@ -286,7 +286,7 @@ impl System {
             panic!(
                 "No se encontró la página {} del proceso {}",
                 page_index, pid_to_find
-            )
+            );
         }
     }
 
@@ -297,6 +297,11 @@ impl System {
             PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
         };
         let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
+        println!(
+            "Swap out de la página {} del proceso {}",
+            self.real_mem[frame_index_to_be_replaced].unwrap().index,
+            self.real_mem[frame_index_to_be_replaced].unwrap().pid
+        );
         self.virt_mem[empty_frame_index_in_virtual] = self.real_mem[frame_index_to_be_replaced];
         frame_index_to_be_replaced
     }
