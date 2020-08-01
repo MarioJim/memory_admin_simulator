@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::process::PID;
 
 pub fn ceil_div(top: usize, bot: usize) -> usize {
@@ -53,5 +55,17 @@ pub fn string_to_bool(maybe_string: Option<&str>, instruction_name: &str) -> Res
         Ok(1) => Ok(true),
         Ok(num) => Err(format!("Número {} no válido para un booleano", num)),
         Err(e) => Err(e),
+    }
+}
+
+pub fn display_ranges_vec(vector: &Vec<Range<usize>>) -> String {
+    if vector.is_empty() {
+        String::from("nada")
+    } else {
+        vector
+            .iter()
+            .map(|range| format!("{} a {}", range.start, range.end))
+            .collect::<Vec<String>>()
+            .join(", ")
     }
 }

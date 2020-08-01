@@ -5,6 +5,7 @@ use std::ops::Range;
 use crate::algorithm::PageReplacementAlgorithm;
 use crate::process::{Process, ProcessPage, PID};
 use crate::time::Time;
+use crate::util;
 use crate::Instruction;
 
 mod algorithms;
@@ -46,16 +47,14 @@ impl System {
     }
 
     pub fn process_instruction(&mut self, instruction: &Instruction) {
-        let time_offset = match instruction {
+        let maybe_time_offset = match instruction {
             Instruction::Process { pid, size } => {
-                if *size as usize <= self.real_mem.len() * self.page_size {
-                    self.process(*pid, *size)
+                if self.processes.get(pid).is_some() {
+                    Err(format!("Ya existe un proceso con el pid {}", *pid))
+                } else if *size > self.real_mem.len() * self.page_size {
+                    Err(format!("El tamaño del proceso ({} bytes) es mayor al de la memoria real ({} bytes)", *size, self.real_mem.len() * self.page_size))
                 } else {
-                    println!(
-                        "La instrucción no se ha ejecutado ya que el proceso no cabe en memoria"
-                    );
-                    println!("Disminuya el tamaño del proceso o aumente el tamaño de la memoria con la opción -m");
-                    Time::new()
+                    Ok(self.process(*pid, *size))
                 }
             }
             Instruction::Access {
@@ -63,27 +62,37 @@ impl System {
                 address,
                 modifies,
             } => {
-                if self.is_valid_pid(*pid, Some(*address)) {
-                    self.access(*pid, *address, *modifies)
+                if self.processes.get(pid).is_none() {
+                    Err(format!("No existe un proceso con el pid {}", *pid))
+                } else if !self.processes.get(pid).unwrap().includes_address(*address) {
+                    Err(format!(
+                        "El proceso {} no contiene la dirección virtual {}",
+                        *pid, *address
+                    ))
                 } else {
-                    Time::new()
+                    Ok(self.access(*pid, *address, *modifies))
                 }
             }
             Instruction::Free { pid } => {
-                if self.is_valid_pid(*pid, None) {
-                    self.free(*pid)
+                if self.processes.get(pid).is_none() {
+                    Err(format!("Ya existe un proceso con el pid {}", *pid))
                 } else {
-                    Time::new()
+                    Ok(self.free(*pid))
                 }
             }
             Instruction::End() => {
                 self.end();
-                Time::new()
+                Ok(Time::new())
             }
-            Instruction::Comment(_) | Instruction::Exit() => Time::new(),
+            Instruction::Comment(_) | Instruction::Exit() => Ok(Time::new()),
         };
-        println!("La instrucción tomó {}", time_offset);
-        self.time += time_offset;
+        match maybe_time_offset {
+            Ok(time_offset) => {
+                println!("La instrucción tomó {}", time_offset);
+                self.time += time_offset;
+            }
+            Err(error_message) => println!("Error: {}", error_message),
+        }
         println!();
     }
 
@@ -137,13 +146,15 @@ impl System {
             }
         };
         println!(
-            "Se {} la página {} del proceso {}",
+            "Se {} la dirección {} del proceso {} (página {})",
             if modifies { "modificó" } else { "accedió a" },
+            virtual_address,
             process_page_index,
             pid_to_access
         );
         println!(
-            "Esta página corresponde al marco {} de la memoria real",
+            "Esta dirección corresponde a la dirección {} en la memoria real (marco {})",
+            real_mem_index * self.page_size + (virtual_address % self.page_size),
             real_mem_index
         );
         time_offset += if modifies {
@@ -192,11 +203,7 @@ impl System {
             });
         println!(
             "Se liberan de la memoria real: {}",
-            r_freed_ranges
-                .iter()
-                .map(|range| format!("{} a {}", range.start, range.end))
-                .collect::<Vec<String>>()
-                .join(", ")
+            util::display_ranges_vec(&r_freed_ranges)
         );
 
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
@@ -210,11 +217,7 @@ impl System {
             });
         println!(
             "Se liberan de la memoria virtual: {}",
-            v_freed_ranges
-                .iter()
-                .map(|range| format!("{} a {}", range.start, range.end))
-                .collect::<Vec<String>>()
-                .join(", ")
+            util::display_ranges_vec(&v_freed_ranges)
         );
 
         self.processes

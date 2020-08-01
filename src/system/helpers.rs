@@ -6,17 +6,6 @@ use crate::process::PID;
 use crate::time::Time;
 
 impl System {
-    pub fn is_valid_pid(&self, checked_pid: PID, maybe_address: Option<usize>) -> bool {
-        match (self.processes.get(&checked_pid), maybe_address) {
-            (Some(process), Some(address)) => process.includes_address(address),
-            (Some(_), None) => true,
-            (None, _) => {
-                println!("Instrucción ignorada: no existe un proceso con ese pid");
-                false
-            }
-        }
-    }
-
     pub fn find_page(&self, pid_to_find: PID, page_index: usize) -> Frame {
         if let Some(m_index) = self.real_mem.iter().position(|frame| match frame {
             Some(page) => page.pid == pid_to_find && page.index == page_index,
