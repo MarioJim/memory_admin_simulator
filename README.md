@@ -2,10 +2,11 @@
 
 Final project for Operating Systems written in Rust
 
-A toy simulator used to compare between two page replacement algorithms:
+A toy simulator used to compare between some page replacement algorithms:
 
 - First In First Out
 - Least Recently Used
+- Randomly selected
 
 The simulator has 2048 bytes of real memory and 4096 bytes of virtual memory divided into frames of 16 bytes by default, but these values can be changed.
 
@@ -33,8 +34,8 @@ It logs the string `comment` into the output.
 
 It resets the simulator (empties both memories and resets time) and prints the following statistics:
 
-- Turnaround time (per process and average)
-- Page faults per process
+- Turnaround time per process
+- Average turnaround time
 - Number of swap-ins and swap-outs
 
 ### E

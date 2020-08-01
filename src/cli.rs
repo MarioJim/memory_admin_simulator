@@ -11,6 +11,7 @@ pub fn get_app() -> clap::App<'static, 'static> {
                 .possible_values(&[
                     PageReplacementAlgorithm::FIFO.as_str(),
                     PageReplacementAlgorithm::LRU.as_str(),
+                    PageReplacementAlgorithm::Random.as_str(),
                 ])
                 .help("Sets the algorithm to choose which page gets replaced in memory")
                 .takes_value(true)

@@ -30,6 +30,7 @@ impl System {
         let frame_index_to_be_replaced = match self.algorithm {
             PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
             PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
+            PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
         };
         let pid = self.real_mem[frame_index_to_be_replaced]
             .as_ref()

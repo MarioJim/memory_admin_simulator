@@ -4,6 +4,7 @@ use clap::ArgMatches;
 pub enum PageReplacementAlgorithm {
     FIFO,
     LRU,
+    Random,
 }
 
 impl PageReplacementAlgorithm {
@@ -11,6 +12,7 @@ impl PageReplacementAlgorithm {
         match self {
             PageReplacementAlgorithm::FIFO => "fifo",
             PageReplacementAlgorithm::LRU => "lru",
+            PageReplacementAlgorithm::Random => "rand",
         }
     }
 
@@ -27,6 +29,7 @@ impl PageReplacementAlgorithm {
         {
             "fifo" => PageReplacementAlgorithm::FIFO,
             "lru" => PageReplacementAlgorithm::LRU,
+            "rand" => PageReplacementAlgorithm::Random,
             _ => panic!("Un algoritmo con ese nombre no se ha implementado"),
         }
     }

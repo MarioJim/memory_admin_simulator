@@ -1,3 +1,5 @@
+use rand::random;
+
 use super::System;
 
 impl System {
@@ -19,5 +21,9 @@ impl System {
             .min_by_key(|(_, maybe_frame)| maybe_frame.as_ref().unwrap().accessed)
             .unwrap();
         index
+    }
+
+    pub fn rand_find_page_to_replace(&self) -> usize {
+        random::<usize>() % self.real_mem.len()
     }
 }
