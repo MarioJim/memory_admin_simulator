@@ -31,6 +31,11 @@ impl System {
             PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
             PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
         };
+        let pid = self.real_mem[frame_index_to_be_replaced]
+            .as_ref()
+            .unwrap()
+            .pid;
+        self.processes.get_mut(&pid).unwrap().add_swap_out();
         let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
         println!(
             "Swap out de la página {} del proceso {}",

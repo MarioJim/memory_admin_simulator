@@ -122,16 +122,13 @@ impl System {
         time_offset
     }
 
-    fn access(&mut self, pid_to_access: PID, virtual_address: usize, modifies: bool) -> Time {
+    fn access(&mut self, pid: PID, process_address: usize, modifies: bool) -> Time {
         let mut time_offset = Time::new();
-        let process_page_index = virtual_address / self.page_size;
-        let real_mem_index = match self.find_page(pid_to_access, process_page_index) {
+        let process_page_index = process_address / self.page_size;
+        let real_mem_index = match self.find_page(pid, process_page_index) {
             Frame(Memory::Real, index) => index,
             Frame(Memory::Virtual, index) => {
-                self.processes
-                    .get_mut(&pid_to_access)
-                    .unwrap()
-                    .add_page_fault();
+                self.processes.get_mut(&pid).unwrap().add_swap_in();
                 let empty_frame_index = self.swap_out_page(&mut time_offset);
                 swap(
                     &mut self.real_mem[empty_frame_index],
@@ -148,13 +145,13 @@ impl System {
         println!(
             "Se {} la dirección {} del proceso {} (página {})",
             if modifies { "modificó" } else { "accedió a" },
-            virtual_address,
+            process_address,
             process_page_index,
-            pid_to_access
+            pid
         );
         println!(
-            "Esta dirección corresponde a la dirección {} en la memoria real (marco {})",
-            real_mem_index * self.page_size + (virtual_address % self.page_size),
+            "Esta dirección corresponde a la dirección {} en la memoria real (marco de página {})",
+            real_mem_index * self.page_size + (process_address % self.page_size),
             real_mem_index
         );
         time_offset += if modifies {
@@ -166,17 +163,17 @@ impl System {
         time_offset
     }
 
-    fn free(&mut self, pid_to_free: PID) -> Time {
+    fn free(&mut self, pid: PID) -> Time {
         let frame_is_freed = |index: usize,
                               maybe_frame: &mut Option<ProcessPage>,
                               ranges: &mut Vec<Range<usize>>| {
             match maybe_frame {
                 Some(ProcessPage {
-                    pid,
+                    pid: pages_pid,
                     index: _,
                     created: _,
                     accessed: _,
-                }) if *pid == pid_to_free => {
+                }) if *pages_pid == pid => {
                     *maybe_frame = None;
                     match ranges.last_mut() {
                         Some(Range { start: _, end }) if *end == index - 1 => *end = index,
@@ -191,41 +188,38 @@ impl System {
             }
         };
 
-        let mut time = Time::new();
+        let mut time_offset = Time::new();
         let mut r_freed_ranges = Vec::<Range<usize>>::new();
         self.real_mem
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
                 if frame_is_freed(index, maybe_frame, &mut r_freed_ranges) {
-                    time += FREE_PAGE_TIME;
+                    time_offset += FREE_PAGE_TIME;
                 }
             });
         println!(
             "Se liberan de la memoria real: {}",
             util::display_ranges_vec(&r_freed_ranges)
         );
-
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
         self.virt_mem
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
                 if frame_is_freed(index, maybe_frame, &mut v_freed_ranges) {
-                    time += FREE_PAGE_TIME;
+                    time_offset += FREE_PAGE_TIME;
                 }
             });
         println!(
             "Se liberan de la memoria virtual: {}",
             util::display_ranges_vec(&v_freed_ranges)
         );
-
         self.processes
-            .get_mut(&pid_to_free)
+            .get_mut(&pid)
             .unwrap()
-            .set_death(self.time + time);
-
-        time
+            .set_death(self.time + time_offset);
+        time_offset
     }
 
     fn end(&mut self) {
@@ -250,23 +244,23 @@ impl System {
                 process.calc_turnaround()
             );
         });
-        let average_turnaround = finished_processes
+        let average_turnaround_in_ms = finished_processes
             .iter()
             .map(|process| process.calc_turnaround())
             .fold(0.0, |sum, turnaround| sum + f64::from(turnaround))
-            / finished_processes.len() as f64
-            / 1000.0;
-        println!("Turnaround promedio: {} segundos", average_turnaround);
-
-        println!("Page faults por proceso:");
+            / finished_processes.len() as f64;
+        println!(
+            "Turnaround promedio: {} segundos",
+            average_turnaround_in_ms / 1000.0
+        );
+        println!("Swaps por proceso:");
         finished_processes.iter().for_each(|process| {
+            let (swap_ins, swap_outs) = process.get_swaps();
             println!(
-                "\tProceso {}: {} page faults",
-                process.pid,
-                process.get_page_faults(),
+                "\tProceso {}:\t{} swap-ins,\t{} swap-outs",
+                process.pid, swap_ins, swap_outs,
             );
         });
-        // TODO: Calcular núm de swaps (out e in)
     }
 }
 

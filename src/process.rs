@@ -10,7 +10,8 @@ pub struct Process {
     pub pid: PID,
     size: usize,
     life: Range<Time>,
-    page_faults: u16,
+    swap_ins: u16,
+    swap_outs: u16,
 }
 
 impl Process {
@@ -19,7 +20,8 @@ impl Process {
             pid,
             size,
             life: (Time::new()..Time::max()),
-            page_faults: 0,
+            swap_ins: 0,
+            swap_outs: 0,
         }
     }
 
@@ -31,12 +33,16 @@ impl Process {
         address < self.size
     }
 
-    pub fn add_page_fault(&mut self) {
-        self.page_faults += 1;
+    pub fn add_swap_in(&mut self) {
+        self.swap_ins += 1;
     }
 
-    pub fn get_page_faults(&self) -> u16 {
-        self.page_faults
+    pub fn add_swap_out(&mut self) {
+        self.swap_outs += 1;
+    }
+
+    pub fn get_swaps(&self) -> (u16, u16) {
+        (self.swap_ins, self.swap_outs)
     }
 
     pub fn has_died(&self) -> bool {
