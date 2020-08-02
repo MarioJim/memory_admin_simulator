@@ -1,29 +1,54 @@
-use rand::random;
+use rand::prelude::*;
 
 use super::System;
+use crate::time::Time;
 
 impl System {
-    pub fn fifo_find_page_to_replace(&self) -> usize {
-        let (index, _) = self
+    pub fn fifo_find_n_pages_to_replace(&self, n: usize) -> Vec<usize> {
+        let mut page_indexes: Vec<(usize, &Time)> = self
             .real_memory
             .iter()
             .enumerate()
-            .min_by_key(|(_, maybe_frame)| maybe_frame.as_ref().unwrap().get_created_time())
-            .unwrap();
-        index
+            .filter_map(|(index, frame)| {
+                frame.as_ref().map(|page| (index, page.get_created_time()))
+            })
+            .collect();
+
+        page_indexes.sort_unstable_by_key(|(_, &time_created)| time_created);
+        assert!(page_indexes.len() >= n, "More pages needed than available");
+        page_indexes.truncate(n);
+
+        page_indexes.into_iter().map(|(index, _)| index).collect()
     }
 
-    pub fn lru_find_page_to_replace(&self) -> usize {
-        let (index, _) = self
+    pub fn lru_find_n_pages_to_replace(&self, n: usize) -> Vec<usize> {
+        let mut page_indexes: Vec<(usize, &Time)> = self
             .real_memory
             .iter()
             .enumerate()
-            .min_by_key(|(_, maybe_frame)| maybe_frame.as_ref().unwrap().get_accessed_time())
-            .unwrap();
-        index
+            .filter_map(|(index, frame)| {
+                frame.as_ref().map(|page| (index, page.get_accessed_time()))
+            })
+            .collect();
+
+        page_indexes.sort_unstable_by_key(|(_, &time_accessed)| time_accessed);
+        assert!(page_indexes.len() >= n, "More pages needed than available");
+        page_indexes.truncate(n);
+
+        page_indexes.into_iter().map(|(index, _)| index).collect()
     }
 
-    pub fn rand_find_page_to_replace(&self) -> usize {
-        random::<usize>() % self.real_memory.len()
+    pub fn rand_find_n_pages_to_replace(&self, n: usize) -> Vec<usize> {
+        let mut page_indexes: Vec<usize> = self
+            .real_memory
+            .iter()
+            .enumerate()
+            .filter_map(|(index, frame)| frame.as_ref().map(|_| index))
+            .collect();
+        page_indexes.shuffle(&mut rand::thread_rng());
+        assert!(page_indexes.len() >= n, "More pages needed than available");
+        page_indexes.truncate(n);
+
+        page_indexes
     }
 }

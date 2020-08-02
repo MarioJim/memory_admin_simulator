@@ -1,9 +1,13 @@
+use std::collections::BTreeSet;
+use std::collections::HashMap;
 use std::mem::swap;
+use std::ops::Range;
 
 use super::{Frame, Memory, System, SWAP_PAGE_TIME};
 use crate::algorithm::PageReplacementAlgorithm;
 use crate::process::{ProcessPage, PID};
 use crate::time::Time;
+use crate::util;
 
 impl System {
     pub fn find_page(&self, pid: PID, page_index: usize) -> Frame {
@@ -24,44 +28,80 @@ impl System {
     }
 
     pub fn get_empty_frame_index(&mut self, time_offset: &mut Time) -> usize {
-        match self.find_empty_frame(Memory::Real) {
-            Ok(index) => index,
-            Err(_) => {
-                *time_offset += SWAP_PAGE_TIME;
-                let frame_index_to_be_replaced = match self.algorithm {
-                    PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
-                    PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
-                    PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
-                };
-                let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
-                    .as_ref()
-                    .unwrap()
-                    .get_page_info();
-                self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
-                let empty_frame_index_in_swap = self.find_empty_frame(Memory::Swap).unwrap();
-                println!("Swap out de la página {} del proceso {}", page_index, pid);
-                swap(
-                    &mut self.swap_space[empty_frame_index_in_swap],
-                    &mut self.real_memory[frame_index_to_be_replaced],
-                );
-                frame_index_to_be_replaced
-            }
-        }
+        self.get_n_empty_frame_indexes(1, time_offset)[0]
     }
 
-    pub fn find_empty_frame(&self, memory: Memory) -> Result<usize, ()> {
-        let maybe_empty_frame = match memory {
-            Memory::Real => &self.real_memory,
-            Memory::Swap => &self.swap_space,
+    pub fn get_n_empty_frame_indexes(&mut self, n: usize, time_offset: &mut Time) -> Vec<usize> {
+        let mut set_of_indexes = BTreeSet::<usize>::new();
+        set_of_indexes.extend(
+            self.real_memory
+                .iter()
+                .enumerate()
+                .filter_map(|(index, frame)| match frame {
+                    Some(_) => None,
+                    None => Some(index),
+                })
+                .into_iter(),
+        );
+        if set_of_indexes.len() >= n {
+            let mut result: Vec<usize> = set_of_indexes.into_iter().collect();
+            result.truncate(n);
+            return result;
         }
-        .iter()
-        .enumerate()
-        .find(|(_, maybe_frame)| maybe_frame.is_none());
+        let frames_needed = n - set_of_indexes.len();
+        let frame_indexes = match self.algorithm {
+            PageReplacementAlgorithm::FIFO => self.fifo_find_n_pages_to_replace(frames_needed),
+            PageReplacementAlgorithm::LRU => self.lru_find_n_pages_to_replace(frames_needed),
+            PageReplacementAlgorithm::Random => self.rand_find_n_pages_to_replace(frames_needed),
+        };
+        let mut swapped_out_ranges = HashMap::<PID, Vec<Range<usize>>>::new();
+        for frame_index_to_be_replaced in frame_indexes {
+            assert!(
+                !set_of_indexes.contains(&frame_index_to_be_replaced),
+                "Algorithm included empty frame (?)"
+            );
+            *time_offset += SWAP_PAGE_TIME;
+            let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
+                .as_ref()
+                .unwrap()
+                .get_page_info();
 
-        match maybe_empty_frame {
-            Some((index, _)) => Ok(index),
-            None => Err(()),
+            match swapped_out_ranges.get_mut(&pid) {
+                Some(vec_of_ranges) => util::add_index_to_vec_of_ranges(page_index, vec_of_ranges),
+                None => {
+                    let mut new_vec_of_ranges = Vec::<Range<usize>>::new();
+                    util::add_index_to_vec_of_ranges(page_index, &mut new_vec_of_ranges);
+                    swapped_out_ranges.insert(pid, new_vec_of_ranges);
+                }
+            }
+            self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
+            let empty_frame_index_in_swap = self
+                .swap_space
+                .iter()
+                .enumerate()
+                .find(|(_, maybe_frame)| maybe_frame.is_none())
+                .unwrap()
+                .0;
+            swap(
+                &mut self.swap_space[empty_frame_index_in_swap],
+                &mut self.real_memory[frame_index_to_be_replaced],
+            );
+            set_of_indexes.insert(frame_index_to_be_replaced);
         }
+
+        swapped_out_ranges.iter().for_each(|(pid, ranges)| {
+            if let Some(ranges_str) = util::display_ranges_vec(&ranges) {
+                println!("Swap out de páginas del proceso {}: {}", pid, ranges_str);
+            }
+        });
+
+        let mut vec_of_indexes: Vec<usize> = set_of_indexes.into_iter().collect();
+        vec_of_indexes.sort_unstable();
+        assert!(
+            vec_of_indexes.len() == n,
+            "Delivering wrong amount of frames"
+        );
+        vec_of_indexes
     }
 
     pub fn calc_free_space(&self) -> usize {

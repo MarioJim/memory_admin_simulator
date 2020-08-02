@@ -128,8 +128,11 @@ impl System {
             total_size, pages_needed, pid,
         );
         let mut time_offset = Time::new();
-        for page_index in 0..pages_needed {
-            let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
+        for (page_index, empty_frame_index) in self
+            .get_n_empty_frame_indexes(pages_needed, &mut time_offset)
+            .into_iter()
+            .enumerate()
+        {
             self.real_memory[empty_frame_index] =
                 Some(ProcessPage::new(pid, page_index, self.time + time_offset));
             time_offset += LOAD_PAGE_TIME;
@@ -209,10 +212,9 @@ impl System {
                     util::add_index_to_vec_of_ranges(index, &mut r_freed_ranges);
                 }
             });
-        println!(
-            "Se liberan de la memoria real: {}",
-            util::display_ranges_vec(&r_freed_ranges),
-        );
+        if let Some(ranges_str) = util::display_ranges_vec(&r_freed_ranges) {
+            println!("Se liberan de la memoria real: {}", ranges_str);
+        }
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
         self.swap_space
             .iter_mut()
@@ -223,10 +225,9 @@ impl System {
                     util::add_index_to_vec_of_ranges(index, &mut v_freed_ranges);
                 }
             });
-        println!(
-            "Se liberan del espacio swap: {}",
-            util::display_ranges_vec(&v_freed_ranges),
-        );
+        if let Some(ranges_str) = util::display_ranges_vec(&v_freed_ranges) {
+            println!("Se liberan del espacio swap: {}", ranges_str);
+        }
         now_dead_process.set_death(self.time + time_offset);
         self.dead_processes.push(now_dead_process);
         time_offset

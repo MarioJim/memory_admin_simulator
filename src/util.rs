@@ -58,21 +58,29 @@ pub fn string_to_bool(maybe_string: Option<&str>, instruction_name: &str) -> Res
     }
 }
 
-pub fn display_ranges_vec(vector: &Vec<Range<usize>>) -> String {
+pub fn display_ranges_vec(vector: &Vec<Range<usize>>) -> Option<String> {
     if vector.is_empty() {
-        String::from("nada")
+        None
     } else {
-        vector
-            .iter()
-            .map(|range| format!("{} a {}", range.start, range.end))
-            .collect::<Vec<String>>()
-            .join(", ")
+        Some(
+            vector
+                .iter()
+                .map(|range| {
+                    if range.start != range.end {
+                        format!("{} a {}", range.start, range.end)
+                    } else {
+                        format!("{}", range.start)
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join(", "),
+        )
     }
 }
 
 pub fn add_index_to_vec_of_ranges(index: usize, vec_of_ranges: &mut Vec<Range<usize>>) {
     match vec_of_ranges.last_mut() {
-        Some(Range { start: _, end }) if *end == index - 1 => *end = index,
+        Some(Range { start: _, end }) if *end + 1 == index => *end = index,
         Some(_) | None => vec_of_ranges.push(Range {
             start: index,
             end: index,
