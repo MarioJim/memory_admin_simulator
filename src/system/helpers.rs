@@ -28,10 +28,15 @@ impl System {
     }
 
     pub fn get_empty_frame_index(&mut self, time_offset: &mut Time) -> usize {
-        self.get_n_empty_frame_indexes(1, time_offset)[0]
+        self.get_n_empty_frame_indexes(1, time_offset, false)[0]
     }
 
-    pub fn get_n_empty_frame_indexes(&mut self, n: usize, time_offset: &mut Time) -> Vec<usize> {
+    pub fn get_n_empty_frame_indexes(
+        &mut self,
+        n: usize,
+        time_offset: &mut Time,
+        should_clean_space: bool,
+    ) -> Vec<usize> {
         let mut set_of_indexes = BTreeSet::<usize>::new();
         set_of_indexes.extend(
             self.real_memory
@@ -75,17 +80,18 @@ impl System {
                 }
             }
             self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
-            let empty_frame_index_in_swap = self
-                .swap_space
-                .iter()
-                .enumerate()
-                .find(|(_, maybe_frame)| maybe_frame.is_none())
-                .unwrap()
-                .0;
-            swap(
-                &mut self.swap_space[empty_frame_index_in_swap],
-                &mut self.real_memory[frame_index_to_be_replaced],
-            );
+            if should_clean_space {
+                let (empty_frame_index_in_swap, _) = self
+                    .swap_space
+                    .iter()
+                    .enumerate()
+                    .find(|(_, maybe_frame)| maybe_frame.is_none())
+                    .unwrap();
+                swap(
+                    &mut self.swap_space[empty_frame_index_in_swap],
+                    &mut self.real_memory[frame_index_to_be_replaced],
+                );
+            }
             set_of_indexes.insert(frame_index_to_be_replaced);
         }
 
