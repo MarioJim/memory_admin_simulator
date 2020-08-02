@@ -32,6 +32,10 @@ fn main() {
                 println!("{}", ins);
                 system.process_instruction(&ins);
             }
-            Err(e) => println!("Error: {}", e),
+            Err((ins, error)) => {
+                println!("Error al analizar instrucción \"{}\"", ins);
+                println!("{}", error);
+                println!();
+            }
         });
 }

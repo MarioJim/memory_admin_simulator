@@ -23,21 +23,26 @@ pub enum Instruction {
     Exit(),
 }
 
-impl TryFrom<&str> for Instruction {
-    type Error = String;
+impl<'a> TryFrom<&'a str> for Instruction {
+    type Error = (&'a str, String);
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let mut line_iter = value.split_ascii_whitespace();
         match line_iter.next() {
             Some("P") => {
-                let size = util::string_to_usize(line_iter.next(), "P")?;
-                let pid = util::string_to_pid(line_iter.next(), "P")?;
+                let size = util::string_to_usize(line_iter.next(), "P")
+                    .map_err(|err_message| (value, err_message))?;
+                let pid = util::string_to_pid(line_iter.next(), "P")
+                    .map_err(|err_message| (value, err_message))?;
                 Ok(Instruction::Process { pid, size })
             }
             Some("A") => {
-                let address = util::string_to_usize(line_iter.next(), "A")?;
-                let pid = util::string_to_pid(line_iter.next(), "A")?;
-                let modifies = util::string_to_bool(line_iter.next(), "A")?;
+                let address = util::string_to_usize(line_iter.next(), "A")
+                    .map_err(|err_message| (value, err_message))?;
+                let pid = util::string_to_pid(line_iter.next(), "A")
+                    .map_err(|err_message| (value, err_message))?;
+                let modifies = util::string_to_bool(line_iter.next(), "A")
+                    .map_err(|err_message| (value, err_message))?;
                 Ok(Instruction::Access {
                     address,
                     modifies,
@@ -45,14 +50,15 @@ impl TryFrom<&str> for Instruction {
                 })
             }
             Some("L") => {
-                let pid = util::string_to_pid(line_iter.next(), "L")?;
+                let pid = util::string_to_pid(line_iter.next(), "L")
+                    .map_err(|err_message| (value, err_message))?;
                 Ok(Instruction::Free { pid })
             }
             Some("C") => Ok(Instruction::Comment(String::from(&value[2..]))),
             Some("F") => Ok(Instruction::End()),
             Some("E") => Ok(Instruction::Exit()),
-            Some(other) => Err(format!("Instrucción no reconocida: \"{}\"", other)),
-            None => Err(String::from("Línea vacía")),
+            Some(other) => Err((value, format!("Instrucción no reconocida: \"{}\"", other))),
+            None => Err((value, String::from("Línea vacía"))),
         }
     }
 }
