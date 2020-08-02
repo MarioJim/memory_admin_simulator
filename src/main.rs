@@ -27,15 +27,19 @@ fn main() {
 
     file.lines()
         .map(|line| Instruction::try_from(line))
-        .for_each(|maybe_ins| match maybe_ins {
-            Ok(ins) => {
-                println!("{}", ins);
-                system.process_instruction(&ins);
+        .for_each(|maybe_ins| {
+            match maybe_ins {
+                Ok(ins) => {
+                    println!("{}", ins);
+                    system.process_instruction(&ins);
+                }
+                Err((ins, error)) => {
+                    if ins.len() > 0 {
+                        println!("{}", ins);
+                    }
+                    println!("Error al analizar instrucción: {}", error);
+                }
             }
-            Err((ins, error)) => {
-                println!("Error al analizar instrucción \"{}\"", ins);
-                println!("{}", error);
-                println!();
-            }
+            println!();
         });
 }

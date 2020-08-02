@@ -117,7 +117,6 @@ impl System {
             }
             Err(error_message) => println!("Error: {}", error_message),
         };
-        println!();
     }
 
     fn process(&mut self, pid: PID, total_size: usize) -> Time {

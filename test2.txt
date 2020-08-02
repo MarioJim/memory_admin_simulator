@@ -1,0 +1,36 @@
+C comenzamos...
+P 2048 1 ignora cualquier comentario, como éste.
+P 2048 2
+P 2048 3
+P -1 5
+A 1 1 0
+A 33 1 1
+A 1 2 0
+A 33 2 1
+L 3
+L 1
+L 2
+L 5
+L
+
+P 1500 3
+A 1 1 0
+A 33 1 1
+A 1 2 0
+A 33 2 1
+L 2
+
+P 1233 6
+P 1700 2
+A 1 1 0
+A 33 1 1
+A 1 2 0
+A 33 2 1
+A 15 2 0
+A 82 1 0
+L 3
+P 32 3522
+L 1
+L 3523
+L 3522
+F
