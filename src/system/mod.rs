@@ -72,6 +72,11 @@ impl System {
             } => {
                 if self.processes.get(pid).is_none() {
                     Err(format!("No existe un proceso con el pid {}", *pid))
+                } else if self.processes.get(pid).unwrap().has_died() {
+                    Err(format!(
+                        "El proceso con el pid {} ha sido liberado de la memoria",
+                        *pid
+                    ))
                 } else if !self.processes.get(pid).unwrap().includes_address(*address) {
                     Err(format!(
                         "El proceso {} no contiene la dirección virtual {}",
@@ -83,7 +88,12 @@ impl System {
             }
             Instruction::Free { pid } => {
                 if self.processes.get(pid).is_none() {
-                    Err(format!("Ya existe un proceso con el pid {}", *pid))
+                    Err(format!("No existe un proceso con el pid {}", *pid))
+                } else if self.processes.get(pid).unwrap().has_died() {
+                    Err(format!(
+                        "El proceso con el pid {} ha sido liberado de la memoria",
+                        *pid
+                    ))
                 } else {
                     Ok(self.free(*pid))
                 }
@@ -113,10 +123,7 @@ impl System {
         );
         let mut time_offset = Time::new();
         for page_index in 0..pages_needed {
-            let empty_frame_index = match self.find_empty_frame(Memory::Real) {
-                Ok(index) => index,
-                Err(_) => self.free_real_mem_frame(&mut time_offset),
-            };
+            let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
             self.real_mem[empty_frame_index] = Some(ProcessPage {
                 pid,
                 index: page_index,
@@ -133,11 +140,11 @@ impl System {
     fn access(&mut self, pid: PID, process_address: usize, modifies: bool) -> Time {
         let mut time_offset = Time::new();
         let process_page_index = process_address / self.page_size;
-        let real_mem_index = match self.find_page(pid, process_page_index) {
+        let empty_frame_index = match self.find_page(pid, process_page_index) {
             Frame(Memory::Real, index) => index,
             Frame(Memory::Virtual, index) => {
                 self.processes.get_mut(&pid).unwrap().add_swap_in();
-                let empty_frame_index = self.free_real_mem_frame(&mut time_offset);
+                let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
                 swap(
                     &mut self.real_mem[empty_frame_index],
                     &mut self.virt_mem[index],
@@ -159,15 +166,15 @@ impl System {
         );
         println!(
             "Esta dirección corresponde a la dirección {} en la memoria real (marco de página {})",
-            real_mem_index * self.page_size + (process_address % self.page_size),
-            real_mem_index
+            empty_frame_index * self.page_size + (process_address % self.page_size),
+            empty_frame_index
         );
         time_offset += if modifies {
             MODIFY_PAGE_TIME
         } else {
             ACCESS_PAGE_TIME
         };
-        self.real_mem[real_mem_index].as_mut().unwrap().accessed = self.time + time_offset;
+        self.real_mem[empty_frame_index].as_mut().unwrap().accessed = self.time + time_offset;
         time_offset
     }
 
