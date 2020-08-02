@@ -39,7 +39,7 @@ impl System {
                     .as_ref()
                     .unwrap()
                     .pid;
-                self.processes.get_mut(&pid).unwrap().add_swap_out();
+                self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
                 let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
                 println!(
                     "Swap out de la página {} del proceso {}",

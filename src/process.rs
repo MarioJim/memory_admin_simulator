@@ -45,10 +45,6 @@ impl Process {
         (self.swap_ins, self.swap_outs)
     }
 
-    pub fn has_died(&self) -> bool {
-        self.life.end != Time::max()
-    }
-
     pub fn set_birth(&mut self, birth: Time) {
         self.life.start = birth;
     }

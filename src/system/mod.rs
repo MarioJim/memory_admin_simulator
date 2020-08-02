@@ -21,7 +21,8 @@ const SWAP_PAGE_TIME: Time = Time::from_miliseconds(1000);
 pub struct System {
     algorithm: PageReplacementAlgorithm,
     time: Time,
-    processes: HashMap<PID, Process>,
+    alive_processes: HashMap<PID, Process>,
+    dead_processes: Vec<Process>,
     page_size: usize,
     real_mem: Vec<Option<ProcessPage>>,
     virt_mem: Vec<Option<ProcessPage>>,
@@ -39,7 +40,8 @@ impl System {
         System {
             algorithm,
             time: Time::new(),
-            processes: HashMap::new(),
+            alive_processes: HashMap::new(),
+            dead_processes: Vec::new(),
             page_size,
             real_mem: (0..num_real_frames).map(|_| None).collect(),
             virt_mem: (0..num_virt_frames).map(|_| None).collect(),
@@ -49,17 +51,20 @@ impl System {
     pub fn process_instruction(&mut self, instruction: &Instruction) {
         let maybe_time_offset = match instruction {
             Instruction::Process { pid, size } => {
-                if self.processes.get(pid).is_some() {
-                    Err(format!("Ya existe un proceso con el pid {}", *pid))
+                if self.alive_processes.get(pid).is_some() {
+                    Err(format!(
+                        "Ya existe un proceso ejecutándose con el pid {}",
+                        *pid,
+                    ))
                 } else if *size > self.calc_free_space() {
                     Err(format!(
                         "El tamaño del proceso ({} bytes) es mayor a la memoria disponible en el sistema ({} bytes)",
-                        *size, self.calc_free_space()
+                        *size, self.calc_free_space(),
                     ))
                 } else if *size > self.real_mem.len() * self.page_size {
                     Err(format!(
                         "El tamaño del proceso ({} bytes) es mayor al de la memoria real ({} bytes)",
-                        *size, self.real_mem.len() * self.page_size
+                        *size, self.real_mem.len() * self.page_size,
                     ))
                 } else {
                     Ok(self.process(*pid, *size))
@@ -70,29 +75,30 @@ impl System {
                 address,
                 modifies,
             } => {
-                if self.processes.get(pid).is_none() {
-                    Err(format!("No existe un proceso con el pid {}", *pid))
-                } else if self.processes.get(pid).unwrap().has_died() {
+                if self.alive_processes.get(pid).is_none() {
                     Err(format!(
-                        "El proceso con el pid {} ha sido liberado de la memoria",
-                        *pid
+                        "No existe un proceso ejecutándose con el pid {}",
+                        *pid,
                     ))
-                } else if !self.processes.get(pid).unwrap().includes_address(*address) {
+                } else if !self
+                    .alive_processes
+                    .get(pid)
+                    .unwrap()
+                    .includes_address(*address)
+                {
                     Err(format!(
                         "El proceso {} no contiene la dirección virtual {}",
-                        *pid, *address
+                        *pid, *address,
                     ))
                 } else {
                     Ok(self.access(*pid, *address, *modifies))
                 }
             }
             Instruction::Free { pid } => {
-                if self.processes.get(pid).is_none() {
-                    Err(format!("No existe un proceso con el pid {}", *pid))
-                } else if self.processes.get(pid).unwrap().has_died() {
+                if self.alive_processes.get(pid).is_none() {
                     Err(format!(
-                        "El proceso con el pid {} ha sido liberado de la memoria",
-                        *pid
+                        "No existe un proceso ejecutándose con el pid {}",
+                        *pid,
                     ))
                 } else {
                     Ok(self.free(*pid))
@@ -133,7 +139,7 @@ impl System {
             time_offset += LOAD_PAGE_TIME;
         }
         new_process.set_birth(self.time + time_offset);
-        self.processes.insert(pid, new_process);
+        self.alive_processes.insert(pid, new_process);
         time_offset
     }
 
@@ -143,7 +149,7 @@ impl System {
         let empty_frame_index = match self.find_page(pid, process_page_index) {
             Frame(Memory::Real, index) => index,
             Frame(Memory::Virtual, index) => {
-                self.processes.get_mut(&pid).unwrap().add_swap_in();
+                self.alive_processes.get_mut(&pid).unwrap().add_swap_in();
                 let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
                 swap(
                     &mut self.real_mem[empty_frame_index],
@@ -190,6 +196,7 @@ impl System {
             };
 
         let mut time_offset = Time::new();
+        let mut now_dead_process = self.alive_processes.remove(&pid).unwrap();
         let mut r_freed_ranges = Vec::<Range<usize>>::new();
         self.real_mem
             .iter_mut()
@@ -218,28 +225,14 @@ impl System {
             "Se liberan de la memoria virtual: {}",
             util::display_ranges_vec(&v_freed_ranges)
         );
-        self.processes
-            .get_mut(&pid)
-            .unwrap()
-            .set_death(self.time + time_offset);
+        now_dead_process.set_death(self.time + time_offset);
+        self.dead_processes.push(now_dead_process);
         time_offset
     }
 
     fn end(&mut self) {
-        let finished_processes: Vec<&Process> = self
-            .processes
-            .iter()
-            .filter_map(|(_, process)| {
-                if process.has_died() {
-                    Some(process)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
         println!("Turnaround de cada proceso:");
-        finished_processes.iter().for_each(|process| {
+        self.dead_processes.iter().for_each(|process| {
             println!(
                 "\tProceso {}: {}, {} de turnaround",
                 process.pid,
@@ -247,17 +240,18 @@ impl System {
                 process.calc_turnaround()
             );
         });
-        let average_turnaround_in_ms = finished_processes
+        let average_turnaround_in_ms = self
+            .dead_processes
             .iter()
             .map(|process| process.calc_turnaround())
             .fold(0.0, |sum, turnaround| sum + f64::from(turnaround))
-            / finished_processes.len() as f64;
+            / self.dead_processes.len() as f64;
         println!(
             "Turnaround promedio: {} segundos",
             average_turnaround_in_ms / 1000.0
         );
         println!("Swaps por proceso:");
-        finished_processes.iter().for_each(|process| {
+        self.dead_processes.iter().for_each(|process| {
             let (swap_ins, swap_outs) = process.get_swaps();
             println!(
                 "\tProceso {}:\t{} swap-ins,\t{} swap-outs",
