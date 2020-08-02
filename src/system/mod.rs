@@ -24,27 +24,27 @@ pub struct System {
     alive_processes: HashMap<PID, Process>,
     dead_processes: Vec<Process>,
     page_size: usize,
-    real_mem: Vec<Option<ProcessPage>>,
-    virt_mem: Vec<Option<ProcessPage>>,
+    real_memory: Vec<Option<ProcessPage>>,
+    swap_space: Vec<Option<ProcessPage>>,
 }
 
 impl System {
     pub fn new(
         algorithm: PageReplacementAlgorithm,
         page_size: usize,
-        real_mem_size: usize,
-        virtual_mem_size: usize,
+        real_memory_size: usize,
+        swap_space_size: usize,
     ) -> Self {
-        let num_real_frames = util::ceil_div(real_mem_size, page_size);
-        let num_virt_frames = util::ceil_div(virtual_mem_size, page_size);
+        let num_real_frames = util::ceil_div(real_memory_size, page_size);
+        let num_swap_frames = util::ceil_div(swap_space_size, page_size);
         System {
             algorithm,
             time: Time::new(),
             alive_processes: HashMap::new(),
             dead_processes: Vec::new(),
             page_size,
-            real_mem: (0..num_real_frames).map(|_| None).collect(),
-            virt_mem: (0..num_virt_frames).map(|_| None).collect(),
+            real_memory: (0..num_real_frames).map(|_| None).collect(),
+            swap_space: (0..num_swap_frames).map(|_| None).collect(),
         }
     }
 
@@ -61,10 +61,10 @@ impl System {
                         "El tamaño del proceso ({} bytes) es mayor a la memoria disponible en el sistema ({} bytes)",
                         *size, self.calc_free_space(),
                     ))
-                } else if *size > self.real_mem.len() * self.page_size {
+                } else if *size > self.real_memory.len() * self.page_size {
                     Err(format!(
                         "El tamaño del proceso ({} bytes) es mayor al de la memoria real ({} bytes)",
-                        *size, self.real_mem.len() * self.page_size,
+                        *size, self.real_memory.len() * self.page_size,
                     ))
                 } else {
                     Ok(self.process(*pid, *size))
@@ -130,7 +130,7 @@ impl System {
         let mut time_offset = Time::new();
         for page_index in 0..pages_needed {
             let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
-            self.real_mem[empty_frame_index] = Some(ProcessPage {
+            self.real_memory[empty_frame_index] = Some(ProcessPage {
                 pid,
                 index: page_index,
                 created: self.time + time_offset,
@@ -148,17 +148,17 @@ impl System {
         let process_page_index = process_address / self.page_size;
         let empty_frame_index = match self.find_page(pid, process_page_index) {
             Frame(Memory::Real, index) => index,
-            Frame(Memory::Virtual, index) => {
+            Frame(Memory::Swap, index) => {
                 self.alive_processes.get_mut(&pid).unwrap().add_swap_in();
                 let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
                 swap(
-                    &mut self.real_mem[empty_frame_index],
-                    &mut self.virt_mem[index],
+                    &mut self.real_memory[empty_frame_index],
+                    &mut self.swap_space[index],
                 );
                 println!(
                     "Swap in de la página {} del proceso {}",
-                    self.real_mem[empty_frame_index].as_ref().unwrap().index,
-                    self.real_mem[empty_frame_index].as_ref().unwrap().pid
+                    self.real_memory[empty_frame_index].as_ref().unwrap().index,
+                    self.real_memory[empty_frame_index].as_ref().unwrap().pid
                 );
                 empty_frame_index
             }
@@ -180,7 +180,10 @@ impl System {
         } else {
             ACCESS_PAGE_TIME
         };
-        self.real_mem[empty_frame_index].as_mut().unwrap().accessed = self.time + time_offset;
+        self.real_memory[empty_frame_index]
+            .as_mut()
+            .unwrap()
+            .accessed = self.time + time_offset;
         time_offset
     }
 
@@ -198,7 +201,7 @@ impl System {
         let mut time_offset = Time::new();
         let mut now_dead_process = self.alive_processes.remove(&pid).unwrap();
         let mut r_freed_ranges = Vec::<Range<usize>>::new();
-        self.real_mem
+        self.real_memory
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
@@ -212,7 +215,7 @@ impl System {
             util::display_ranges_vec(&r_freed_ranges)
         );
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
-        self.virt_mem
+        self.swap_space
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
@@ -222,7 +225,7 @@ impl System {
                 }
             });
         println!(
-            "Se liberan de la memoria virtual: {}",
+            "Se liberan del espacio swap: {}",
             util::display_ranges_vec(&v_freed_ranges)
         );
         now_dead_process.set_death(self.time + time_offset);
@@ -263,7 +266,7 @@ impl System {
 
 pub enum Memory {
     Real,
-    Virtual,
+    Swap,
 }
 
 pub struct Frame(Memory, usize);

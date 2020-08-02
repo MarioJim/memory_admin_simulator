@@ -7,16 +7,16 @@ use crate::time::Time;
 
 impl System {
     pub fn find_page(&self, pid: PID, page_index: usize) -> Frame {
-        if let Some(m_index) = self.real_mem.iter().position(|frame| match frame {
+        if let Some(m_index) = self.real_memory.iter().position(|frame| match frame {
             Some(page) => page.pid == pid && page.index == page_index,
             None => false,
         }) {
             Frame(Memory::Real, m_index)
-        } else if let Some(s_index) = self.virt_mem.iter().position(|frame| match frame {
+        } else if let Some(s_index) = self.swap_space.iter().position(|frame| match frame {
             Some(page) => page.pid == pid && page.index == page_index,
             None => false,
         }) {
-            Frame(Memory::Virtual, s_index)
+            Frame(Memory::Swap, s_index)
         } else {
             panic!(
                 "No se encontró la página {} del proceso {}",
@@ -35,26 +35,26 @@ impl System {
                     PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
                     PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
                 };
-                let pid = self.real_mem[frame_index_to_be_replaced]
+                let pid = self.real_memory[frame_index_to_be_replaced]
                     .as_ref()
                     .unwrap()
                     .pid;
                 self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
-                let empty_frame_index_in_virtual = self.find_empty_frame(Memory::Virtual).unwrap();
+                let empty_frame_index_in_swap = self.find_empty_frame(Memory::Swap).unwrap();
                 println!(
                     "Swap out de la página {} del proceso {}",
-                    self.real_mem[frame_index_to_be_replaced]
+                    self.real_memory[frame_index_to_be_replaced]
                         .as_ref()
                         .unwrap()
                         .index,
-                    self.real_mem[frame_index_to_be_replaced]
+                    self.real_memory[frame_index_to_be_replaced]
                         .as_ref()
                         .unwrap()
                         .pid
                 );
                 swap(
-                    &mut self.virt_mem[empty_frame_index_in_virtual],
-                    &mut self.real_mem[frame_index_to_be_replaced],
+                    &mut self.swap_space[empty_frame_index_in_swap],
+                    &mut self.real_memory[frame_index_to_be_replaced],
                 );
                 frame_index_to_be_replaced
             }
@@ -63,8 +63,8 @@ impl System {
 
     pub fn find_empty_frame(&self, memory: Memory) -> Result<usize, ()> {
         let maybe_empty_frame = match memory {
-            Memory::Real => &self.real_mem,
-            Memory::Virtual => &self.virt_mem,
+            Memory::Real => &self.real_memory,
+            Memory::Swap => &self.swap_space,
         }
         .iter()
         .enumerate()
@@ -80,8 +80,8 @@ impl System {
         let free_frames_accumulator =
             |acc: usize, frame: &Option<_>| if frame.is_none() { acc + 1 } else { acc };
 
-        let free_frames = self.real_mem.iter().fold(0, free_frames_accumulator)
-            + self.virt_mem.iter().fold(0, free_frames_accumulator);
+        let free_frames = self.real_memory.iter().fold(0, free_frames_accumulator)
+            + self.swap_space.iter().fold(0, free_frames_accumulator);
 
         self.page_size * free_frames
     }
