@@ -130,12 +130,8 @@ impl System {
         let mut time_offset = Time::new();
         for page_index in 0..pages_needed {
             let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
-            self.real_memory[empty_frame_index] = Some(ProcessPage {
-                pid,
-                index: page_index,
-                created: self.time + time_offset,
-                accessed: self.time + time_offset,
-            });
+            self.real_memory[empty_frame_index] =
+                Some(ProcessPage::new(pid, page_index, self.time + time_offset));
             time_offset += LOAD_PAGE_TIME;
         }
         new_process.set_birth(self.time + time_offset);
@@ -155,10 +151,13 @@ impl System {
                     &mut self.real_memory[empty_frame_index],
                     &mut self.swap_space[index],
                 );
+                let (page_pid, page_index) = self.real_memory[empty_frame_index]
+                    .as_ref()
+                    .unwrap()
+                    .get_page_info();
                 println!(
                     "Swap in de la página {} del proceso {}",
-                    self.real_memory[empty_frame_index].as_ref().unwrap().index,
-                    self.real_memory[empty_frame_index].as_ref().unwrap().pid
+                    page_index, page_pid,
                 );
                 empty_frame_index
             }
@@ -173,7 +172,7 @@ impl System {
         println!(
             "Esta dirección corresponde a la dirección {} en la memoria real (marco de página {})",
             empty_frame_index * self.page_size + (process_address % self.page_size),
-            empty_frame_index
+            empty_frame_index,
         );
         time_offset += if modifies {
             MODIFY_PAGE_TIME
@@ -183,14 +182,14 @@ impl System {
         self.real_memory[empty_frame_index]
             .as_mut()
             .unwrap()
-            .accessed = self.time + time_offset;
+            .update_accessed_time(self.time + time_offset);
         time_offset
     }
 
     fn free(&mut self, pid: PID) -> Time {
         let frame_is_freed =
             |index: usize, maybe_frame: &mut Option<ProcessPage>| -> Option<usize> {
-                if maybe_frame.is_some() && maybe_frame.as_ref().unwrap().pid == pid {
+                if maybe_frame.is_some() && maybe_frame.as_ref().unwrap().get_pid() == pid {
                     *maybe_frame = None;
                     Some(index)
                 } else {
@@ -212,7 +211,7 @@ impl System {
             });
         println!(
             "Se liberan de la memoria real: {}",
-            util::display_ranges_vec(&r_freed_ranges)
+            util::display_ranges_vec(&r_freed_ranges),
         );
         let mut v_freed_ranges = Vec::<Range<usize>>::new();
         self.swap_space
@@ -226,7 +225,7 @@ impl System {
             });
         println!(
             "Se liberan del espacio swap: {}",
-            util::display_ranges_vec(&v_freed_ranges)
+            util::display_ranges_vec(&v_freed_ranges),
         );
         now_dead_process.set_death(self.time + time_offset);
         self.dead_processes.push(now_dead_process);
@@ -238,9 +237,9 @@ impl System {
         self.dead_processes.iter().for_each(|process| {
             println!(
                 "\tProceso {}: {}, {} de turnaround",
-                process.pid,
+                process.get_pid(),
                 process.display_life(),
-                process.calc_turnaround()
+                process.calc_turnaround(),
             );
         });
         let average_turnaround_in_ms = self
@@ -251,14 +250,16 @@ impl System {
             / self.dead_processes.len() as f64;
         println!(
             "Turnaround promedio: {} segundos",
-            average_turnaround_in_ms / 1000.0
+            average_turnaround_in_ms / 1000.0,
         );
         println!("Swaps por proceso:");
         self.dead_processes.iter().for_each(|process| {
             let (swap_ins, swap_outs) = process.get_swaps();
             println!(
                 "\tProceso {}:\t{} swap-ins,\t{} swap-outs",
-                process.pid, swap_ins, swap_outs,
+                process.get_pid(),
+                swap_ins,
+                swap_outs,
             );
         });
     }

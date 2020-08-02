@@ -7,7 +7,7 @@ pub type PID = u16;
 
 #[derive(Debug)]
 pub struct Process {
-    pub pid: PID,
+    pid: PID,
     size: usize,
     life: Range<Time>,
     swap_ins: u16,
@@ -23,6 +23,10 @@ impl Process {
             swap_ins: 0,
             swap_outs: 0,
         }
+    }
+
+    pub fn get_pid(&self) -> PID {
+        self.pid
     }
 
     pub fn num_pages(&self, page_size: usize) -> usize {
@@ -64,8 +68,39 @@ impl Process {
 
 #[derive(Debug)]
 pub struct ProcessPage {
-    pub pid: PID,
-    pub index: usize,
-    pub created: Time,
-    pub accessed: Time,
+    pid: PID,
+    index: usize,
+    created: Time,
+    accessed: Time,
+}
+
+impl ProcessPage {
+    pub fn new(pid: PID, index: usize, created: Time) -> Self {
+        ProcessPage {
+            pid,
+            index,
+            created,
+            accessed: created,
+        }
+    }
+
+    pub fn get_pid(&self) -> PID {
+        self.pid
+    }
+
+    pub fn get_page_info(&self) -> (PID, usize) {
+        (self.pid, self.index)
+    }
+
+    pub fn get_created_time(&self) -> &Time {
+        &self.created
+    }
+
+    pub fn get_accessed_time(&self) -> &Time {
+        &self.accessed
+    }
+
+    pub fn update_accessed_time(&mut self, accessed: Time) {
+        self.accessed = accessed;
+    }
 }

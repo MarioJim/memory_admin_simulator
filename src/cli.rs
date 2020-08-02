@@ -93,7 +93,7 @@ pub fn get_size(matches: &ArgMatches, arg: SizeArgument) -> usize {
                     println!(
                         "Couldn't parse argument {} as a number, using the default ({})",
                         arg.as_str(),
-                        arg.default()
+                        arg.default(),
                     );
                     arg.default()
                 }

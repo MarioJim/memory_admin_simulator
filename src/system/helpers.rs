@@ -2,25 +2,23 @@ use std::mem::swap;
 
 use super::{Frame, Memory, System, SWAP_PAGE_TIME};
 use crate::algorithm::PageReplacementAlgorithm;
-use crate::process::PID;
+use crate::process::{ProcessPage, PID};
 use crate::time::Time;
 
 impl System {
     pub fn find_page(&self, pid: PID, page_index: usize) -> Frame {
-        if let Some(m_index) = self.real_memory.iter().position(|frame| match frame {
-            Some(page) => page.pid == pid && page.index == page_index,
-            None => false,
-        }) {
+        let frame_meets_conditions = |frame: &Option<ProcessPage>| -> bool {
+            frame.is_some() && frame.as_ref().unwrap().get_page_info() == (pid, page_index)
+        };
+
+        if let Some(m_index) = self.real_memory.iter().position(frame_meets_conditions) {
             Frame(Memory::Real, m_index)
-        } else if let Some(s_index) = self.swap_space.iter().position(|frame| match frame {
-            Some(page) => page.pid == pid && page.index == page_index,
-            None => false,
-        }) {
+        } else if let Some(s_index) = self.swap_space.iter().position(frame_meets_conditions) {
             Frame(Memory::Swap, s_index)
         } else {
             panic!(
                 "No se encontró la página {} del proceso {}",
-                page_index, pid
+                page_index, pid,
             );
         }
     }
@@ -35,23 +33,13 @@ impl System {
                     PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
                     PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
                 };
-                let pid = self.real_memory[frame_index_to_be_replaced]
+                let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
                     .as_ref()
                     .unwrap()
-                    .pid;
+                    .get_page_info();
                 self.alive_processes.get_mut(&pid).unwrap().add_swap_out();
                 let empty_frame_index_in_swap = self.find_empty_frame(Memory::Swap).unwrap();
-                println!(
-                    "Swap out de la página {} del proceso {}",
-                    self.real_memory[frame_index_to_be_replaced]
-                        .as_ref()
-                        .unwrap()
-                        .index,
-                    self.real_memory[frame_index_to_be_replaced]
-                        .as_ref()
-                        .unwrap()
-                        .pid
-                );
+                println!("Swap out de la página {} del proceso {}", page_index, pid);
                 swap(
                     &mut self.swap_space[empty_frame_index_in_swap],
                     &mut self.real_memory[frame_index_to_be_replaced],
