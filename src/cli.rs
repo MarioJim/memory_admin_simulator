@@ -36,14 +36,14 @@ pub fn get_app() -> clap::App<'static, 'static> {
             Arg::with_name(SizeArgument::RealMem.as_str())
                 .short("r")
                 .long("real-mem")
-                .help("Sets the size of the real memory in bytes, defaults to 2048")
+                .help("Sets the size of the real memory in bytes, defaults to 2048 bytes")
                 .takes_value(true),
         )
         .arg(
             Arg::with_name(SizeArgument::VirtualMem.as_str())
                 .short("v")
                 .long("virtual-mem")
-                .help("Sets the size of the virtual memory in bytes, defaults to 4096")
+                .help("Sets the size of the virtual memory in bytes, defaults to 4096 bytes")
                 .takes_value(true),
         )
 }

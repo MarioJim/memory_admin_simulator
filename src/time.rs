@@ -27,7 +27,7 @@ impl fmt::Debug for Time {
 
 impl fmt::Display for Time {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}s", self.0 as f64 / 1000.0)
+        write!(f, "{}s", f64::from(*self) / 1000.0)
     }
 }
 

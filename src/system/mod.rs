@@ -34,15 +34,15 @@ impl System {
         real_mem_size: usize,
         virtual_mem_size: usize,
     ) -> Self {
-        let num_real_frames = ((real_mem_size as f64) / (page_size as f64)).ceil() as usize;
-        let num_virtual_frames = ((virtual_mem_size as f64) / (page_size as f64)).ceil() as usize;
+        let num_real_frames = util::ceil_div(real_mem_size, page_size);
+        let num_virt_frames = util::ceil_div(virtual_mem_size, page_size);
         System {
             algorithm,
             time: Time::new(),
             processes: HashMap::new(),
             page_size,
-            real_mem: vec![None; num_real_frames],
-            virt_mem: vec![None; num_virtual_frames],
+            real_mem: (0..num_real_frames).map(|_| None).collect(),
+            virt_mem: (0..num_virt_frames).map(|_| None).collect(),
         }
     }
 
@@ -92,7 +92,7 @@ impl System {
                 self.time += time_offset;
             }
             Err(error_message) => println!("Error: {}", error_message),
-        }
+        };
         println!();
     }
 
@@ -146,8 +146,8 @@ impl System {
             "Se {} la dirección {} del proceso {} (página {})",
             if modifies { "modificó" } else { "accedió a" },
             process_address,
+            pid,
             process_page_index,
-            pid
         );
         println!(
             "Esta dirección corresponde a la dirección {} en la memoria real (marco de página {})",
@@ -164,29 +164,15 @@ impl System {
     }
 
     fn free(&mut self, pid: PID) -> Time {
-        let frame_is_freed = |index: usize,
-                              maybe_frame: &mut Option<ProcessPage>,
-                              ranges: &mut Vec<Range<usize>>| {
-            match maybe_frame {
-                Some(ProcessPage {
-                    pid: pages_pid,
-                    index: _,
-                    created: _,
-                    accessed: _,
-                }) if *pages_pid == pid => {
+        let frame_is_freed =
+            |index: usize, maybe_frame: &mut Option<ProcessPage>| -> Option<usize> {
+                if maybe_frame.is_some() && maybe_frame.as_ref().unwrap().pid == pid {
                     *maybe_frame = None;
-                    match ranges.last_mut() {
-                        Some(Range { start: _, end }) if *end == index - 1 => *end = index,
-                        Some(_) | None => ranges.push(Range {
-                            start: index,
-                            end: index,
-                        }),
-                    };
-                    true
+                    Some(index)
+                } else {
+                    None
                 }
-                Some(_) | None => false,
-            }
-        };
+            };
 
         let mut time_offset = Time::new();
         let mut r_freed_ranges = Vec::<Range<usize>>::new();
@@ -194,8 +180,9 @@ impl System {
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
-                if frame_is_freed(index, maybe_frame, &mut r_freed_ranges) {
+                if let Some(index) = frame_is_freed(index, maybe_frame) {
                     time_offset += FREE_PAGE_TIME;
+                    util::add_index_to_vec_of_ranges(index, &mut r_freed_ranges);
                 }
             });
         println!(
@@ -207,8 +194,9 @@ impl System {
             .iter_mut()
             .enumerate()
             .for_each(|(index, maybe_frame)| {
-                if frame_is_freed(index, maybe_frame, &mut v_freed_ranges) {
+                if let Some(index) = frame_is_freed(index, maybe_frame) {
                     time_offset += FREE_PAGE_TIME;
+                    util::add_index_to_vec_of_ranges(index, &mut v_freed_ranges);
                 }
             });
         println!(
