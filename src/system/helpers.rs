@@ -25,7 +25,7 @@ impl System {
         }
     }
 
-    pub fn swap_out_page(&mut self, time_offset: &mut Time) -> usize {
+    pub fn free_real_mem_frame(&mut self, time_offset: &mut Time) -> usize {
         *time_offset += SWAP_PAGE_TIME;
         let frame_index_to_be_replaced = match self.algorithm {
             PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
@@ -69,5 +69,15 @@ impl System {
             Some((index, _)) => Ok(index),
             None => Err(()),
         }
+    }
+
+    pub fn calc_free_space(&self) -> usize {
+        let free_frames_accumulator =
+            |acc: usize, frame: &Option<_>| if frame.is_none() { acc + 1 } else { acc };
+
+        let free_frames = self.real_mem.iter().fold(0, free_frames_accumulator)
+            + self.virt_mem.iter().fold(0, free_frames_accumulator);
+
+        self.page_size * free_frames
     }
 }

@@ -51,8 +51,16 @@ impl System {
             Instruction::Process { pid, size } => {
                 if self.processes.get(pid).is_some() {
                     Err(format!("Ya existe un proceso con el pid {}", *pid))
+                } else if *size > self.calc_free_space() {
+                    Err(format!(
+                        "El tamaño del proceso ({} bytes) es mayor a la memoria disponible en el sistema ({} bytes)",
+                        *size, self.calc_free_space()
+                    ))
                 } else if *size > self.real_mem.len() * self.page_size {
-                    Err(format!("El tamaño del proceso ({} bytes) es mayor al de la memoria real ({} bytes)", *size, self.real_mem.len() * self.page_size))
+                    Err(format!(
+                        "El tamaño del proceso ({} bytes) es mayor al de la memoria real ({} bytes)",
+                        *size, self.real_mem.len() * self.page_size
+                    ))
                 } else {
                     Ok(self.process(*pid, *size))
                 }
@@ -107,7 +115,7 @@ impl System {
         for page_index in 0..pages_needed {
             let empty_frame_index = match self.find_empty_frame(Memory::Real) {
                 Ok(index) => index,
-                Err(_) => self.swap_out_page(&mut time_offset),
+                Err(_) => self.free_real_mem_frame(&mut time_offset),
             };
             self.real_mem[empty_frame_index] = Some(ProcessPage {
                 pid,
@@ -129,7 +137,7 @@ impl System {
             Frame(Memory::Real, index) => index,
             Frame(Memory::Virtual, index) => {
                 self.processes.get_mut(&pid).unwrap().add_swap_in();
-                let empty_frame_index = self.swap_out_page(&mut time_offset);
+                let empty_frame_index = self.free_real_mem_frame(&mut time_offset);
                 swap(
                     &mut self.real_mem[empty_frame_index],
                     &mut self.virt_mem[index],
