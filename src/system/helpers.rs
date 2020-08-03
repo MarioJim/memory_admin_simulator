@@ -11,7 +11,7 @@ use crate::time::Time;
 use crate::util;
 
 impl System {
-    pub fn find_page(&self, pid: PID, page_index: usize) -> Frame {
+    pub(super) fn find_page(&self, pid: PID, page_index: usize) -> Frame {
         let frame_meets_conditions = |frame: &Option<ProcessPage>| -> bool {
             frame.is_some() && frame.as_ref().unwrap().get_page_info() == (pid, page_index)
         };
@@ -28,7 +28,7 @@ impl System {
         }
     }
 
-    pub fn get_frame_index_to_swap_into(&mut self, time_offset: &mut Time) -> usize {
+    pub(super) fn get_frame_index_to_swap_into(&mut self, time_offset: &mut Time) -> usize {
         match self
             .real_memory
             .iter()
@@ -38,8 +38,11 @@ impl System {
             Some((index, _)) => return index,
             None => {
                 *time_offset += SWAP_PAGE_TIME;
-                let frame_index_to_be_replaced =
-                    self.get_n_frame_indexes(1).into_iter().next().unwrap();
+                let frame_index_to_be_replaced = match self.algorithm {
+                    PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
+                    PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
+                    PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
+                };
                 let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
                     .as_ref()
                     .unwrap()
@@ -51,7 +54,7 @@ impl System {
         }
     }
 
-    pub fn allocate_n_frames(&mut self, n: usize, time_offset: &mut Time) -> Vec<usize> {
+    pub(super) fn allocate_n_frames(&mut self, n: usize, time_offset: &mut Time) -> Vec<usize> {
         let mut set_of_indexes = BTreeSet::from_iter(
             self.real_memory
                 .iter()
@@ -67,13 +70,14 @@ impl System {
             result.truncate(n);
             return result;
         }
-        let frame_indexes = self.get_n_frame_indexes(n - set_of_indexes.len());
+        let num_frames = n - set_of_indexes.len();
+        let frame_indexes = match self.algorithm {
+            PageReplacementAlgorithm::FIFO => self.fifo_find_n_pages_to_replace(num_frames),
+            PageReplacementAlgorithm::LRU => self.lru_find_n_pages_to_replace(num_frames),
+            PageReplacementAlgorithm::Random => self.rand_find_n_pages_to_replace(num_frames),
+        };
         let mut swapped_out_ranges = HashMap::<PID, Vec<Range<usize>>>::new();
         for frame_index_to_be_replaced in frame_indexes {
-            assert!(
-                !set_of_indexes.contains(&frame_index_to_be_replaced),
-                "Algorithm included empty frame (?)"
-            );
             *time_offset += SWAP_PAGE_TIME;
             let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
                 .as_ref()
@@ -107,22 +111,10 @@ impl System {
         });
         let mut vec_of_indexes = Vec::from_iter(set_of_indexes.into_iter());
         vec_of_indexes.sort_unstable();
-        assert!(
-            vec_of_indexes.len() == n,
-            "Delivering wrong amount of frames"
-        );
         vec_of_indexes
     }
 
-    fn get_n_frame_indexes(&self, n: usize) -> BTreeSet<usize> {
-        match self.algorithm {
-            PageReplacementAlgorithm::FIFO => self.fifo_find_n_pages_to_replace(n),
-            PageReplacementAlgorithm::LRU => self.lru_find_n_pages_to_replace(n),
-            PageReplacementAlgorithm::Random => self.rand_find_n_pages_to_replace(n),
-        }
-    }
-
-    pub fn calc_free_space(&self) -> usize {
+    pub(super) fn calc_free_space(&self) -> usize {
         let free_frames_accumulator =
             |acc: usize, frame: &Option<_>| if frame.is_none() { acc + 1 } else { acc };
 

@@ -232,7 +232,7 @@ impl System {
         println!("Turnaround de cada proceso:");
         self.dead_processes.iter().for_each(|process| {
             println!(
-                "\tProceso {}: {}, {} de turnaround",
+                "\tProceso {}:\t{:16}\t{} de turnaround",
                 process.get_pid(),
                 process.display_life(),
                 process.calc_turnaround(),
