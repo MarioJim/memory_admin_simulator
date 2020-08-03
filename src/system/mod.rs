@@ -128,7 +128,7 @@ impl System {
         );
         let mut time_offset = Time::new();
         for (page_index, empty_frame_index) in self
-            .get_n_empty_frame_indexes(pages_needed, &mut time_offset, true)
+            .allocate_n_frames(pages_needed, &mut time_offset)
             .into_iter()
             .enumerate()
         {
@@ -148,16 +148,16 @@ impl System {
             Frame(Memory::Real, index) => index,
             Frame(Memory::Swap, index) => {
                 self.alive_processes.get_mut(&pid).unwrap().add_swap_in();
-                let empty_frame_index = self.get_empty_frame_index(&mut time_offset);
+                let frame_index_to_swap = self.get_frame_index_to_swap_into(&mut time_offset);
                 swap(
-                    &mut self.real_memory[empty_frame_index],
+                    &mut self.real_memory[frame_index_to_swap],
                     &mut self.swap_space[index],
                 );
                 println!(
                     "Swap in de la página {} del proceso {}",
                     process_page_index, pid,
                 );
-                empty_frame_index
+                frame_index_to_swap
             }
         };
         println!(
