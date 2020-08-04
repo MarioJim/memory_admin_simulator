@@ -1,5 +1,6 @@
 use clap::ArgMatches;
 
+/// Usamos este enum para seleccionar qué algoritmo usará el sistema
 #[derive(Debug)]
 pub enum PageReplacementAlgorithm {
     FIFO,
@@ -8,6 +9,7 @@ pub enum PageReplacementAlgorithm {
 }
 
 impl PageReplacementAlgorithm {
+    /// Esta función se aplica a una variante del enum y regresa un string
     pub fn as_str(&self) -> &'static str {
         match self {
             PageReplacementAlgorithm::FIFO => "fifo",
@@ -16,6 +18,8 @@ impl PageReplacementAlgorithm {
         }
     }
 
+    /// Esta función recibe una referencia a un objeto con las coincidencias de los argumentos
+    /// pasados al programa y regresa qué tipo de algoritmo se eligió
     pub fn from_matches(matches: &ArgMatches) -> Self {
         match matches
             .args
