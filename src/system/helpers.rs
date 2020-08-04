@@ -5,7 +5,6 @@ use std::mem::swap;
 use std::ops::Range;
 
 use super::{Frame, Memory, System, SWAP_PAGE_TIME};
-use crate::algorithm::PageReplacementAlgorithm;
 use crate::process::{ProcessPage, PID};
 use crate::time::Time;
 use crate::util;
@@ -38,11 +37,7 @@ impl System {
             Some((index, _)) => return index,
             None => {
                 *time_offset += SWAP_PAGE_TIME;
-                let frame_index_to_be_replaced = match self.algorithm {
-                    PageReplacementAlgorithm::FIFO => self.fifo_find_page_to_replace(),
-                    PageReplacementAlgorithm::LRU => self.lru_find_page_to_replace(),
-                    PageReplacementAlgorithm::Random => self.rand_find_page_to_replace(),
-                };
+                let frame_index_to_be_replaced = self.find_page_to_replace();
                 let (pid, page_index) = self.real_memory[frame_index_to_be_replaced]
                     .as_ref()
                     .unwrap()
@@ -70,12 +65,7 @@ impl System {
             result.truncate(n);
             return result;
         }
-        let num_frames = n - set_of_indexes.len();
-        let frame_indexes = match self.algorithm {
-            PageReplacementAlgorithm::FIFO => self.fifo_find_n_pages_to_replace(num_frames),
-            PageReplacementAlgorithm::LRU => self.lru_find_n_pages_to_replace(num_frames),
-            PageReplacementAlgorithm::Random => self.rand_find_n_pages_to_replace(num_frames),
-        };
+        let frame_indexes = self.find_n_pages_to_replace(n - set_of_indexes.len());
         let mut swapped_out_ranges = HashMap::<PID, Vec<Range<usize>>>::new();
         for frame_index_to_be_replaced in frame_indexes {
             *time_offset += SWAP_PAGE_TIME;
