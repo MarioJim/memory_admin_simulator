@@ -9,6 +9,8 @@ pub fn ceil_div(top: usize, bot: usize) -> usize {
     }
 }
 
+/// Esta función se encarga de parsear un string y regresar genérico
+/// En el caso de que el parseo sea exitoso se retornará un outcome exitoso, en el caso contrario se retornará un outcome fallido y su correspondiente mensaje de error
 pub fn parse_string<T: std::str::FromStr>(
     maybe_string: Option<&str>,
     instruction_name: &str,
@@ -26,6 +28,8 @@ pub fn parse_string<T: std::str::FromStr>(
     }
 }
 
+/// Esta función se encarga de parsear un string y regresar un número entero
+/// En el caso de que el parseo sea exitoso se retornará un outcome exitoso, en el caso contrario se retornará un outcome fallido y su correspondiente mensaje de error
 pub fn string_to_pid(maybe_string: Option<&str>, instruction_name: &str) -> Result<PID, String> {
     parse_string(
         maybe_string,
@@ -34,6 +38,8 @@ pub fn string_to_pid(maybe_string: Option<&str>, instruction_name: &str) -> Resu
     )
 }
 
+/// Esta función se encarga de parsear un string y regresar un número entero
+/// En el caso de que el parseo sea exitoso se retornará un outcome exitoso, en el caso contrario se retornará un outcome fallido y su correspondiente mensaje de error
 pub fn string_to_usize(
     maybe_string: Option<&str>,
     instruction_name: &str,
@@ -45,6 +51,8 @@ pub fn string_to_usize(
     )
 }
 
+/// Esta función se encarga de parsear un string y regresar un booleano
+/// En el caso de que el parseo sea exitoso se retornará un outcome exitoso, en el caso contrario se retornará un outcome fallido y su correspondiente mensaje de error
 pub fn string_to_bool(maybe_string: Option<&str>, instruction_name: &str) -> Result<bool, String> {
     match parse_string(
         maybe_string,
@@ -58,6 +66,7 @@ pub fn string_to_bool(maybe_string: Option<&str>, instruction_name: &str) -> Res
     }
 }
 
+/// Esta función se encarga de retornar un string opcional que represente un rango
 pub fn display_ranges_vec(vector: &Vec<Range<usize>>) -> Option<String> {
     if vector.is_empty() {
         None
