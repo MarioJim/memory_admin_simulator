@@ -8,7 +8,7 @@
 
 <br/>
 
-## Aditional Info
+## Additional Info
 | language | Version | Lines of code       | Lines of code w/o comments    |
 |----------|---------|---------------------|-------------------------------|
 |  Rust    |  1.45.2 |        1211         |              932              |
