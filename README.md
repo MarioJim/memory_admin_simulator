@@ -1,6 +1,6 @@
 # memory_admin_simulator
 
-Final project for Operating Systems written in Rust
+Final project for Operating Systems written in Rust.
 
 A toy simulator used to compare between some page replacement algorithms:
 
@@ -9,6 +9,15 @@ A toy simulator used to compare between some page replacement algorithms:
 - Randomly selected
 
 The simulator has 2048 bytes of real memory and 4096 bytes of swap space divided into frames of 16 bytes by default, but these values can be changed.
+
+***
+
+## Index 
+1. [Usage](#Usage)
+2. [Installation guide](#Installation-process)
+3. [Execution guide](#Execution-process)
+
+***
 
 ## Usage
 
@@ -41,3 +50,52 @@ It resets the simulator (empties both memories and resets time) and prints the f
 ### E
 
 It ends the simulation and prints an exit message
+
+***
+
+## Installation process
+
+It is necessary to follow a series of steps to be able to execute Rust code. You can follow the steps in this file or check it from [Rust installation - Official page](https://www.rust-lang.org/tools/install).
+
+<br/>
+
+### Install Rust
+First you need to install ***Rust***. To install it in MacOS you only need to use the ***Curl*** utility (it comes natively in MacOS):
+
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+<br/>
+
+### Configure current shell with Cargo
+After installing rust in your computer, you need to configure your current shell executing the following command:
+
+```
+source $HOME/.cargo/env
+```
+***Note:*** You can confirm if Cargo was installed correctly by running the command:
+```
+cargo
+```
+
+<br/>
+
+***
+
+## Execution process
+To execute rust you can use Cargo (Rust package manager). From the terminal located in the project directory, you will only need to execute this command:
+
+```
+cargo run <algorithm> <file>
+```
+***Note:*** It is important to know that sometimes it is required to add some arguments to execute the command, which is the case of our project.
+
+Execute the project using the FIFO algorithm:
+```
+cargo run fifo test1.txt
+```
+Execute the project using the LRU algorithm:
+```
+cargo run lru test1.txt
+```
