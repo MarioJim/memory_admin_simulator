@@ -1,5 +1,20 @@
 # memory_admin_simulator
 
+## Team 7
+- Mario Emilio Jiménez Vizcaíno A01173359
+- Karla Fernanda Ceseña Aragón A00818843
+- Kevin Torres Martínez A01656257
+- Ana Paula Aguilar Favela A01192323
+
+<br/>
+
+## Aditional Info
+| language | Version | Lines of code       | Lines of code w/o comments    |
+|----------|---------|---------------------|-------------------------------|
+|  Rust    |  1.45.2 |        1211         |              932              |
+
+<br/>
+
 Final project for Operating Systems written in Rust.
 
 A toy simulator used to compare between some page replacement algorithms:
@@ -10,12 +25,16 @@ A toy simulator used to compare between some page replacement algorithms:
 
 The simulator has 2048 bytes of real memory and 4096 bytes of swap space divided into frames of 16 bytes by default, but these values can be changed.
 
+<br/>
+
 ***
 
 ## Index 
 1. [Usage](#Usage)
 2. [Installation guide](#Installation-process)
 3. [Execution guide](#Execution-process)
+
+<br/>
 
 ***
 
@@ -51,6 +70,8 @@ It resets the simulator (empties both memories and resets time) and prints the f
 
 It ends the simulation and prints an exit message
 
+<br/>
+
 ***
 
 ## Installation process
@@ -60,7 +81,7 @@ It is necessary to follow a series of steps to be able to execute Rust code. You
 <br/>
 
 ### Install Rust
-First you need to install ***Rust***. To install it in MacOS you only need to use the ***Curl*** utility (it comes natively in MacOS):
+First you need to install ***Rust***. To install it in MacOS you only need to use the ***Curl*** utility (it comes natively in MacOS). Execute the following command from in the terminal:
 
 ```
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -69,7 +90,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 <br/>
 
 ### Configure current shell with Cargo
-After installing rust in your computer, you need to configure your current shell executing the following command:
+After installing rust in your computer, you need to configure your current shell to use Cargo (Rust package manager). Execute the following command from in the terminal:
 
 ```
 source $HOME/.cargo/env
@@ -84,12 +105,14 @@ cargo
 ***
 
 ## Execution process
-To execute rust you can use Cargo (Rust package manager). From the terminal located in the project directory, you will only need to execute this command:
+To execute rust you can use Cargo. From the terminal located in the project directory, you will only need to execute this command:
 
 ```
 cargo run <algorithm> <file>
 ```
 ***Note:*** It is important to know that sometimes it is required to add some arguments to execute the command, which is the case of our project.
+
+<br/>
 
 Execute the project using the FIFO algorithm:
 ```
